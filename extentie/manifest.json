@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Social opvolglijst",
   "version": "1.0",
-  "description": "Verzamel reacties en meldingen van Facebook/LinkedIn via rechtsklik en laat ze samenvatten.",
-  "permissions": ["contextMenus", "storage", "downloads"],
+  "description": "Verzamel tekst, links en screenshots via rechtsklik en laat ze samenvatten.",
+  "permissions": ["contextMenus", "storage", "downloads", "activeTab", "tabs"],
   "host_permissions": ["https://api.anthropic.com/*"],
   "background": {
     "service_worker": "background.js"

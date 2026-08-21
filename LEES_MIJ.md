@@ -5,6 +5,7 @@
 - `extentie/` bevat alleen de bestanden die je in Chrome importeert via
   "Uitgepakte extensie laden".
 - `dev-tools/` bevat hulpmiddelen voor ontwikkeling, zoals een popup-preview.
+  - testcommando: start dev-tools\popup-preview.html
 - `scripts/` bevat hulpscripts voor Git en versiebeheer.
 
 ## Installeren in Chrome
@@ -22,17 +23,36 @@ testdata, zonder dat je de extensie eerst in Chrome moet herladen.
 
 ## Gebruik
 
-1. Selecteer op Facebook of LinkedIn de tekst van een reactie of melding.
-2. Klik rechts, kies "Voeg toe aan opvolglijst".
+1. Selecteer op een website de tekst van een reactie of melding.
+2. Klik rechts, kies "Voeg geselecteerde tekst toe aan opvolglijst".
 3. Klik op het extensie-icoontje om je verzamelde items te zien.
 4. Klik op "Samenvatten met AI" voor een overzicht en antwoordvoorstellen
    (vraagt je Anthropic API-key, blijft enkel lokaal in je browser opgeslagen).
 5. Klik op "Exporteer CSV" om alles in een spreadsheet te bewaren.
 
+Je kan de extensie ook gebruiken buiten Facebook en LinkedIn. Dan bewaart ze de
+domeinnaam als bron, bijvoorbeeld `nieuwssite.be` of `schoolwebsite.be`.
+
+## Links en screenshots bewaren
+
+Via rechtsklik zijn er drie acties:
+
+- "Voeg geselecteerde tekst toe aan opvolglijst": bewaart de tekst en de URL van
+  de huidige pagina.
+- "Bewaar deze link in opvolglijst": bewaart de link waarop je rechtsklikt.
+- "Maak screenshot voor opvolglijst": bewaart een screenshot van het zichtbare
+  deel van het huidige tabblad.
+
+Een screenshot is handig wanneer tekst niet selecteerbaar is. Chrome laat een
+extensie niet zomaar de volledige webpagina of alleen een los geselecteerd
+gebied capteren; deze extensie bewaart daarom het zichtbare vensterdeel.
+
 ## Belangrijk
 
 - De extensie leest enkel tekst die je zelf selecteert. Er gebeurt geen
   automatisch inloggen, scrapen of geautomatiseerd klikken.
+- Screenshots worden lokaal in Chrome storage bewaard. Ze kunnen de opslag
+  sneller doen groeien dan tekstitems.
 - Je API-key wordt nergens naartoe gestuurd behalve rechtstreeks naar
   api.anthropic.com, vanuit je eigen browser.
 - Wil je geen eigen API-key gebruiken: exporteer de CSV en plak de inhoud

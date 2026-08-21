@@ -9,17 +9,38 @@ function maakStorage() {
 
   const previewItems = [
     {
+      type: "tekst",
       platform: "Facebook",
       datum: new Date().toISOString(),
       bron: "https://www.facebook.com/example/posts/123",
+      paginaUrl: "https://www.facebook.com/example/posts/123",
+      paginaTitel: "Voorbeeldbericht Facebook",
       tekst: "Veel ouders vragen of de planning voor volgende week al definitief is.",
       verwerkt: false
     },
     {
+      type: "link",
       platform: "LinkedIn",
       datum: new Date(Date.now() - 86400000).toISOString(),
       bron: "https://www.linkedin.com/feed/update/example",
+      paginaUrl: "https://www.linkedin.com/feed/update/example",
+      paginaTitel: "Voorbeeldupdate LinkedIn",
       tekst: "Interessante update. Kunnen jullie ook delen welke aanpak het meeste resultaat gaf?",
+      verwerkt: false
+    },
+    {
+      type: "screenshot",
+      platform: "voorbeeld.be",
+      datum: new Date(Date.now() - 172800000).toISOString(),
+      bron: "https://voorbeeld.be/nieuws/item",
+      paginaUrl: "https://voorbeeld.be/nieuws/item",
+      paginaTitel: "Voorbeeldpagina",
+      tekst: "Screenshot van zichtbare pagina",
+      screenshot:
+        "data:image/svg+xml;utf8," +
+        encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#f4f7fb"/><rect x="40" y="40" width="560" height="70" rx="8" fill="#d7e3f4"/><rect x="40" y="140" width="420" height="24" rx="4" fill="#8aa6c8"/><rect x="40" y="180" width="500" height="18" rx="4" fill="#b7c7da"/><rect x="40" y="214" width="460" height="18" rx="4" fill="#b7c7da"/></svg>'
+        ),
       verwerkt: false
     }
   ];
@@ -55,7 +76,15 @@ async function laadItems() {
     const div = document.createElement("div");
     div.className = "item";
     const datum = new Date(item.datum).toLocaleString("nl-BE");
-    div.innerHTML = `<div class="meta">${item.platform} · ${datum}</div>${escapeHtml(item.tekst)}`;
+    const bron = item.bron || item.paginaUrl || "";
+    const type = item.type || "tekst";
+
+    div.innerHTML = `
+      <div class="meta">${escapeHtml(item.platform || "Onbekend")} · ${datum} · ${escapeHtml(type)}</div>
+      <div class="tekst">${escapeHtml(item.tekst || "")}</div>
+      ${bron ? `<div class="bron"><a href="${escapeAttr(bron)}" target="_blank" rel="noreferrer">Open bron</a><br>${escapeHtml(korteUrl(bron))}</div>` : ""}
+      ${item.screenshot ? `<img class="screenshot" src="${escapeAttr(item.screenshot)}" alt="Screenshot van bronpagina">` : ""}
+    `;
     lijstEl.appendChild(div);
   });
 }
@@ -64,6 +93,19 @@ function escapeHtml(tekst) {
   const div = document.createElement("div");
   div.textContent = tekst;
   return div.innerHTML;
+}
+
+function escapeAttr(tekst) {
+  return escapeHtml(tekst).replace(/"/g, "&quot;");
+}
+
+function korteUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./, "") + parsed.pathname;
+  } catch {
+    return url;
+  }
 }
 
 async function laadApiKey() {
@@ -86,8 +128,18 @@ document.getElementById("exportBtn").addEventListener("click", async () => {
   const { items = [] } = await storage.get("items");
   if (items.length === 0) return;
 
-  const rijen = [["platform", "datum", "bron", "tekst"]];
-  items.forEach((i) => rijen.push([i.platform, i.datum, i.bron, i.tekst.replace(/\n/g, " ")]));
+  const rijen = [["type", "platform", "datum", "bron", "paginatitel", "tekst", "heeft_screenshot"]];
+  items.forEach((i) =>
+    rijen.push([
+      i.type || "tekst",
+      i.platform,
+      i.datum,
+      i.bron,
+      i.paginaTitel || "",
+      (i.tekst || "").replace(/\n/g, " "),
+      i.screenshot ? "ja" : "nee"
+    ])
+  );
   const csv = rijen.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -121,7 +173,10 @@ document.getElementById("samenvattenBtn").addEventListener("click", async () => 
   samenvattingEl.textContent = "Bezig met samenvatten...";
 
   const tekstBlok = items
-    .map((i) => `[${i.platform} · ${new Date(i.datum).toLocaleDateString("nl-BE")}] ${i.tekst}`)
+    .map((i) => {
+      const screenshotInfo = i.screenshot ? " [screenshot bewaard]" : "";
+      return `[${i.platform} · ${i.type || "tekst"} · ${new Date(i.datum).toLocaleDateString("nl-BE")}] ${i.tekst}${screenshotInfo}\nBron: ${i.bron || i.paginaUrl || ""}`;
+    })
     .join("\n\n");
 
   try {
@@ -140,7 +195,7 @@ document.getElementById("samenvattenBtn").addEventListener("click", async () => 
           {
             role: "user",
             content:
-              "Vat onderstaande verzameling reacties en meldingen van Facebook/LinkedIn samen in het Nederlands. " +
+              "Vat onderstaande verzameling tekst, links en screenshots samen in het Nederlands. " +
               "Groepeer per thema, benoem de toon (positief/kritisch/vraag), en stel waar relevant een kort antwoord voor.\n\n" +
               tekstBlok
           }
