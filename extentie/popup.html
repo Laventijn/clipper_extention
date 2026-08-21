@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<title>Social opvolglijst</title>
+<style>
+  body { font-family: system-ui, sans-serif; width: 380px; padding: 12px; }
+  h1 { font-size: 15px; margin: 0 0 10px; }
+  #lijst { max-height: 260px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; }
+  .item { padding: 8px; border-bottom: 1px solid #eee; font-size: 12px; }
+  .item:last-child { border-bottom: none; }
+  .meta { color: #777; font-size: 11px; margin-bottom: 3px; }
+  .knoppen { margin-top: 10px; display: flex; gap: 6px; }
+  button { flex: 1; padding: 6px; font-size: 12px; cursor: pointer; }
+  #samenvatting { margin-top: 10px; font-size: 12px; white-space: pre-wrap; background: #f7f7f7; padding: 8px; border-radius: 6px; display: none; }
+  #apiKeyRij { margin-top: 10px; font-size: 11px; }
+  input[type=password] { width: 100%; box-sizing: border-box; padding: 4px; font-size: 11px; }
+  .leeg { padding: 12px; color: #999; font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>Verzamelde reacties</h1>
+  <div id="lijst"></div>
+
+  <div class="knoppen">
+    <button id="samenvattenBtn">Samenvatten met AI</button>
+    <button id="exportBtn">Exporteer CSV</button>
+    <button id="wisBtn">Wis lijst</button>
+  </div>
+
+  <div id="samenvatting"></div>
+
+  <div id="apiKeyRij">
+    <label>Anthropic API-key (blijft lokaal opgeslagen):</label>
+    <input type="password" id="apiKey" placeholder="sk-ant-..." />
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
