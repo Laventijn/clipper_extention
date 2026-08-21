@@ -54,7 +54,9 @@ een fallback naar selectie of zichtbaar tabblad.
 - De extensie leest enkel tekst die je zelf selecteert. Er gebeurt geen
   automatisch inloggen, scrapen of geautomatiseerd klikken.
 - Screenshots worden lokaal in Chrome storage bewaard. Ze kunnen de opslag
-  sneller doen groeien dan tekstitems.
+  sneller doen groeien dan tekstitems. De extensie gebruikt daarom
+  `unlimitedStorage`, maar exporteer en wis de lijst best geregeld wanneer je
+  veel screenshots bewaart.
 - Je API-key wordt nergens naartoe gestuurd behalve rechtstreeks naar
   api.anthropic.com, vanuit je eigen browser.
 - Wil je geen eigen API-key gebruiken: exporteer de CSV en plak de inhoud
