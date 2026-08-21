@@ -4,12 +4,18 @@
 <meta charset="UTF-8" />
 <title>Social opvolglijst</title>
 <style>
-  body { font-family: system-ui, sans-serif; width: 380px; padding: 12px; }
+  body { font-family: system-ui, sans-serif; width: min(420px, calc(100vw - 24px)); padding: 12px; }
   h1 { font-size: 15px; margin: 0 0 10px; }
+  .projectRij { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; margin-bottom: 8px; }
+  .projectNaamRij { display: flex; gap: 6px; margin-bottom: 8px; }
+  select, input[type=text] { width: 100%; box-sizing: border-box; padding: 5px; font-size: 12px; }
   #lijst { max-height: 260px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; }
   .item { padding: 8px; border-bottom: 1px solid #eee; font-size: 12px; }
+  .item.verborgen { opacity: 0.55; background: #f8f8f8; }
   .item:last-child { border-bottom: none; }
   .meta { color: #777; font-size: 11px; margin-bottom: 3px; }
+  .itemActies { display: flex; gap: 6px; margin-top: 8px; }
+  .itemActies button { flex: 0 0 auto; padding: 4px 7px; }
   .tekst { line-height: 1.35; overflow-wrap: anywhere; }
   .bron { margin-top: 6px; font-size: 11px; overflow-wrap: anywhere; }
   .bron a { color: #0f5db8; text-decoration: none; }
@@ -17,6 +23,7 @@
   .screenshot { display: block; width: 100%; margin-top: 8px; border: 1px solid #ddd; border-radius: 4px; }
   .knoppen { margin-top: 10px; display: flex; gap: 6px; }
   button { flex: 1; padding: 6px; font-size: 12px; cursor: pointer; }
+  .opties { margin-top: 8px; font-size: 11px; }
   #samenvatting { margin-top: 10px; font-size: 12px; white-space: pre-wrap; background: #f7f7f7; padding: 8px; border-radius: 6px; display: none; }
   #apiKeyRij { margin-top: 10px; font-size: 11px; }
   input[type=password] { width: 100%; box-sizing: border-box; padding: 4px; font-size: 11px; }
@@ -25,13 +32,27 @@
 </head>
 <body>
   <h1>Verzamelde reacties</h1>
+  <div class="projectRij">
+    <select id="projectSelect" aria-label="Project selecteren"></select>
+    <button id="nieuwProjectBtn">Nieuw</button>
+    <button id="hernoemProjectBtn">Hernoem</button>
+  </div>
+  <div class="projectNaamRij" id="projectNaamRij" hidden>
+    <input type="text" id="projectNaam" placeholder="Projectnaam" />
+    <button id="bewaarProjectNaamBtn">Bewaar</button>
+  </div>
   <div id="lijst"></div>
 
   <div class="knoppen">
     <button id="samenvattenBtn">Samenvatten met AI</button>
     <button id="exportBtn">Exporteer CSV</button>
     <button id="wisBtn">Wis lijst</button>
+    <button id="openZijbalkBtn">Zijbalk</button>
   </div>
+  <label class="opties">
+    <input type="checkbox" id="toonVerborgen" />
+    Verborgen records tonen
+  </label>
 
   <div id="samenvatting"></div>
 

@@ -23,15 +23,32 @@ testdata, zonder dat je de extensie eerst in Chrome moet herladen.
 
 ## Gebruik
 
-1. Selecteer op een website de tekst van een reactie of melding.
-2. Klik rechts, kies "Voeg geselecteerde tekst toe aan opvolglijst".
-3. Klik op het extensie-icoontje om je verzamelde items te zien.
-4. Klik op "Samenvatten met AI" voor een overzicht en antwoordvoorstellen
+1. Kies bovenaan in de popup het project waarin je wil werken.
+2. Selecteer op een website de tekst van een reactie of melding.
+3. Klik rechts, kies "Voeg geselecteerde tekst toe aan opvolglijst".
+4. Klik op het extensie-icoontje om je verzamelde items te zien.
+5. Klik op "Samenvatten met AI" voor een overzicht en antwoordvoorstellen
    (vraagt je Anthropic API-key, blijft enkel lokaal in je browser opgeslagen).
-5. Klik op "Exporteer CSV" om alles in een spreadsheet te bewaren.
+6. Klik op "Exporteer CSV" om het huidige project in een spreadsheet te bewaren.
 
 Je kan de extensie ook gebruiken buiten Facebook en LinkedIn. Dan bewaart ze de
 domeinnaam als bron, bijvoorbeeld `nieuwssite.be` of `schoolwebsite.be`.
+
+## Projecten
+
+Bovenaan kan je een project selecteren, een nieuw project maken of de naam van
+het actieve project wijzigen. Nieuwe tekst, links en screenshots worden altijd
+in het actieve project bewaard.
+
+De knop "Wis lijst" verwijdert het project niet. Ze verbergt alleen de zichtbare
+records van het actieve project. Vink "Verborgen records tonen" aan om die
+records opnieuw te zien.
+
+Per record kan je:
+
+- "Verberg" gebruiken om het record niet meer standaard te tonen.
+- "Toon" gebruiken wanneer verborgen records zichtbaar zijn.
+- "Verwijder" gebruiken om het record definitief te verwijderen.
 
 ## Links en screenshots bewaren
 
@@ -44,6 +61,10 @@ Via rechtsklik zijn er drie acties:
   dialoogvenster of pop-upvenster op de pagina. Als dat niet gevonden wordt,
   probeert de extensie de selectie te bewaren. Als ook dat niet lukt, bewaart
   ze het zichtbare deel van het huidige tabblad.
+- "Open opvolglijst in zijbalk": opent dezelfde lijst als Chrome-zijbalk, zodat
+  ze kan blijven staan terwijl je verder werkt.
+
+Je kan de zijbalk ook openen met de knop "Zijbalk" in de popup.
 
 Een screenshot is handig wanneer tekst niet selecteerbaar is. Chrome laat een
 extensie niet op elke website exact hetzelfde element herkennen; daarom is er

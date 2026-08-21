@@ -1,14 +1,25 @@
 const lijstEl = document.getElementById("lijst");
 const samenvattingEl = document.getElementById("samenvatting");
 const apiKeyEl = document.getElementById("apiKey");
+const projectSelectEl = document.getElementById("projectSelect");
+const nieuwProjectBtn = document.getElementById("nieuwProjectBtn");
+const hernoemProjectBtn = document.getElementById("hernoemProjectBtn");
+const projectNaamRijEl = document.getElementById("projectNaamRij");
+const projectNaamEl = document.getElementById("projectNaam");
+const bewaarProjectNaamBtn = document.getElementById("bewaarProjectNaamBtn");
+const toonVerborgenEl = document.getElementById("toonVerborgen");
+const openZijbalkBtn = document.getElementById("openZijbalkBtn");
 const isChromeExtension = Boolean(globalThis.chrome?.storage?.local);
 const storage = maakStorage();
+
+let state = null;
 
 function maakStorage() {
   if (isChromeExtension) return chrome.storage.local;
 
   const previewItems = [
     {
+      id: maakId(),
       type: "tekst",
       platform: "Facebook",
       datum: new Date().toISOString(),
@@ -19,6 +30,7 @@ function maakStorage() {
       verwerkt: false
     },
     {
+      id: maakId(),
       type: "link",
       platform: "LinkedIn",
       datum: new Date(Date.now() - 86400000).toISOString(),
@@ -29,6 +41,7 @@ function maakStorage() {
       verwerkt: false
     },
     {
+      id: maakId(),
       type: "screenshot",
       platform: "voorbeeld.be",
       datum: new Date(Date.now() - 172800000).toISOString(),
@@ -46,35 +59,126 @@ function maakStorage() {
   ];
 
   const beginData = {
-    items: JSON.parse(localStorage.getItem("preview-items") || "null") || previewItems,
-    apiKey: localStorage.getItem("preview-api-key") || ""
+    projecten:
+      JSON.parse(localStorage.getItem("preview-projecten") || "null") ||
+      [{ id: maakId(), naam: "Algemeen", items: previewItems }],
+    actiefProjectId: localStorage.getItem("preview-actief-project-id") || "",
+    apiKey: localStorage.getItem("preview-api-key") || "",
+    toonVerborgen: localStorage.getItem("preview-toon-verborgen") === "true"
   };
 
+  if (!beginData.actiefProjectId || !beginData.projecten.some((p) => p.id === beginData.actiefProjectId)) {
+    beginData.actiefProjectId = beginData.projecten[0].id;
+  }
+
   return {
-    async get(key) {
-      if (typeof key === "string") return { [key]: beginData[key] };
+    async get(keys) {
+      if (typeof keys === "string") return { [keys]: beginData[keys] };
+      if (Array.isArray(keys)) return Object.fromEntries(keys.map((key) => [key, beginData[key]]));
       return beginData;
     },
     async set(data) {
       Object.assign(beginData, data);
-      if ("items" in data) localStorage.setItem("preview-items", JSON.stringify(data.items));
+      if ("projecten" in data) localStorage.setItem("preview-projecten", JSON.stringify(data.projecten));
+      if ("actiefProjectId" in data) localStorage.setItem("preview-actief-project-id", data.actiefProjectId);
       if ("apiKey" in data) localStorage.setItem("preview-api-key", data.apiKey);
+      if ("toonVerborgen" in data) localStorage.setItem("preview-toon-verborgen", String(data.toonVerborgen));
     }
   };
 }
 
-async function laadItems() {
-  const { items = [] } = await storage.get("items");
+async function laadState() {
+  const data = await storage.get(["projecten", "actiefProjectId", "items", "apiKey", "toonVerborgen"]);
+  let projecten = Array.isArray(data.projecten) ? data.projecten : [];
+
+  if (projecten.length === 0) {
+    projecten = [
+      {
+        id: maakId(),
+        naam: "Algemeen",
+        items: Array.isArray(data.items) ? data.items : []
+      }
+    ];
+  }
+
+  projecten = projecten.map((project) => ({
+    id: project.id || maakId(),
+    naam: project.naam || "Naamloos project",
+    items: Array.isArray(project.items) ? project.items.map(normaliseerItem) : []
+  }));
+
+  const actiefProjectId = projecten.some((project) => project.id === data.actiefProjectId)
+    ? data.actiefProjectId
+    : projecten[0].id;
+
+  state = {
+    projecten,
+    actiefProjectId,
+    apiKey: data.apiKey || "",
+    toonVerborgen: Boolean(data.toonVerborgen)
+  };
+
+  await bewaarState();
+}
+
+function normaliseerItem(item) {
+  return {
+    ...item,
+    id: item.id || maakId(),
+    type: item.type || "tekst",
+    verborgen: Boolean(item.verborgen)
+  };
+}
+
+async function bewaarState() {
+  await storage.set({
+    projecten: state.projecten,
+    actiefProjectId: state.actiefProjectId,
+    apiKey: state.apiKey,
+    toonVerborgen: state.toonVerborgen,
+    items: []
+  });
+  await updateBadge();
+}
+
+function actiefProject() {
+  return state.projecten.find((project) => project.id === state.actiefProjectId) || state.projecten[0];
+}
+
+function zichtbareItems(project = actiefProject()) {
+  return project.items.filter((item) => state.toonVerborgen || !item.verborgen);
+}
+
+function renderAlles() {
+  renderProjecten();
+  laadItems();
+  apiKeyEl.value = state.apiKey;
+  toonVerborgenEl.checked = state.toonVerborgen;
+}
+
+function renderProjecten() {
+  projectSelectEl.innerHTML = "";
+  state.projecten.forEach((project) => {
+    const option = document.createElement("option");
+    option.value = project.id;
+    option.textContent = `${project.naam} (${project.items.filter((item) => !item.verborgen).length})`;
+    projectSelectEl.appendChild(option);
+  });
+  projectSelectEl.value = state.actiefProjectId;
+}
+
+function laadItems() {
+  const items = zichtbareItems();
   lijstEl.innerHTML = "";
 
   if (items.length === 0) {
-    lijstEl.innerHTML = '<div class="leeg">Nog geen items. Selecteer tekst op Facebook of LinkedIn en klik rechts.</div>';
+    lijstEl.innerHTML = '<div class="leeg">Geen zichtbare records in dit project.</div>';
     return;
   }
 
   items.slice().reverse().forEach((item) => {
     const div = document.createElement("div");
-    div.className = "item";
+    div.className = `item${item.verborgen ? " verborgen" : ""}`;
     const datum = new Date(item.datum).toLocaleString("nl-BE");
     const bron = item.bron || item.paginaUrl || "";
     const type = item.type || "tekst";
@@ -84,6 +188,10 @@ async function laadItems() {
       <div class="tekst">${escapeHtml(item.tekst || "")}</div>
       ${bron ? `<div class="bron"><a href="${escapeAttr(bron)}" target="_blank" rel="noreferrer">Open bron</a><br>${escapeHtml(korteUrl(bron))}</div>` : ""}
       ${item.screenshot ? `<img class="screenshot" src="${escapeAttr(item.screenshot)}" alt="Screenshot van bronpagina">` : ""}
+      <div class="itemActies">
+        <button data-actie="${item.verborgen ? "toon" : "verberg"}" data-id="${escapeAttr(item.id)}">${item.verborgen ? "Toon" : "Verberg"}</button>
+        <button data-actie="verwijder" data-id="${escapeAttr(item.id)}">Verwijder</button>
+      </div>
     `;
     lijstEl.appendChild(div);
   });
@@ -96,7 +204,7 @@ function escapeHtml(tekst) {
 }
 
 function escapeAttr(tekst) {
-  return escapeHtml(tekst).replace(/"/g, "&quot;");
+  return escapeHtml(String(tekst)).replace(/"/g, "&quot;");
 }
 
 function korteUrl(url) {
@@ -108,29 +216,109 @@ function korteUrl(url) {
   }
 }
 
-async function laadApiKey() {
-  const { apiKey = "" } = await storage.get("apiKey");
-  apiKeyEl.value = apiKey;
+function maakId() {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function updateBadge() {
+  if (!isChromeExtension) return;
+  const aantal = actiefProject().items.filter((item) => !item.verborgen).length;
+  await chrome.action.setBadgeText({ text: aantal ? String(aantal) : "" });
+  await chrome.action.setBadgeBackgroundColor({ color: "#2e7d32" });
 }
 
 apiKeyEl.addEventListener("change", async () => {
-  await storage.set({ apiKey: apiKeyEl.value.trim() });
+  state.apiKey = apiKeyEl.value.trim();
+  await bewaarState();
+});
+
+projectSelectEl.addEventListener("change", async () => {
+  state.actiefProjectId = projectSelectEl.value;
+  projectNaamRijEl.hidden = true;
+  await bewaarState();
+  renderAlles();
+});
+
+nieuwProjectBtn.addEventListener("click", async () => {
+  const naam = prompt("Naam van het nieuwe project?", "Nieuw project");
+  if (!naam) return;
+
+  const project = { id: maakId(), naam: naam.trim(), items: [] };
+  state.projecten.push(project);
+  state.actiefProjectId = project.id;
+  await bewaarState();
+  renderAlles();
+});
+
+hernoemProjectBtn.addEventListener("click", () => {
+  const project = actiefProject();
+  projectNaamEl.value = project.naam;
+  projectNaamRijEl.hidden = false;
+  projectNaamEl.focus();
+});
+
+bewaarProjectNaamBtn.addEventListener("click", async () => {
+  const naam = projectNaamEl.value.trim();
+  if (!naam) return;
+
+  actiefProject().naam = naam;
+  projectNaamRijEl.hidden = true;
+  await bewaarState();
+  renderAlles();
+});
+
+openZijbalkBtn.addEventListener("click", async () => {
+  if (!globalThis.chrome?.sidePanel) return;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  await chrome.sidePanel.open({ windowId: tab.windowId });
+});
+
+toonVerborgenEl.addEventListener("change", async () => {
+  state.toonVerborgen = toonVerborgenEl.checked;
+  await bewaarState();
+  renderAlles();
+});
+
+lijstEl.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-actie]");
+  if (!button) return;
+
+  const project = actiefProject();
+  const item = project.items.find((record) => record.id === button.dataset.id);
+  if (!item) return;
+
+  if (button.dataset.actie === "verwijder") {
+    if (!confirm("Dit record definitief verwijderen?")) return;
+    project.items = project.items.filter((record) => record.id !== item.id);
+  } else {
+    item.verborgen = button.dataset.actie === "verberg";
+  }
+
+  await bewaarState();
+  renderAlles();
 });
 
 document.getElementById("wisBtn").addEventListener("click", async () => {
-  if (!confirm("Volledige lijst wissen?")) return;
-  await storage.set({ items: [] });
-  if (isChromeExtension) chrome.action.setBadgeText({ text: "" });
-  laadItems();
+  const project = actiefProject();
+  if (!confirm(`Alle zichtbare records in "${project.naam}" verbergen? Het project blijft bewaard.`)) return;
+
+  project.items.forEach((item) => {
+    if (!item.verborgen) item.verborgen = true;
+  });
+  await bewaarState();
+  renderAlles();
 });
 
 document.getElementById("exportBtn").addEventListener("click", async () => {
-  const { items = [] } = await storage.get("items");
+  const project = actiefProject();
+  const items = zichtbareItems(project);
   if (items.length === 0) return;
 
-  const rijen = [["type", "platform", "datum", "bron", "paginatitel", "tekst", "heeft_screenshot"]];
+  const rijen = [["project", "verborgen", "type", "platform", "datum", "bron", "paginatitel", "tekst", "heeft_screenshot"]];
   items.forEach((i) =>
     rijen.push([
+      project.naam,
+      i.verborgen ? "ja" : "nee",
       i.type || "tekst",
       i.platform,
       i.datum,
@@ -144,24 +332,26 @@ document.getElementById("exportBtn").addEventListener("click", async () => {
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
+  const bestandsnaam = `${project.naam.replace(/[\\/:*?"<>|]+/g, "-") || "opvolglijst"}.csv`;
   if (globalThis.chrome?.downloads) {
-    chrome.downloads.download({ url, filename: "opvolglijst.csv" });
+    chrome.downloads.download({ url, filename: bestandsnaam });
     return;
   }
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = "opvolglijst.csv";
+  link.download = bestandsnaam;
   link.click();
   URL.revokeObjectURL(url);
 });
 
 document.getElementById("samenvattenBtn").addEventListener("click", async () => {
-  const { items = [] } = await storage.get("items");
-  const { apiKey = "" } = await storage.get("apiKey");
+  const project = actiefProject();
+  const items = zichtbareItems(project);
+  const apiKey = state.apiKey;
 
   if (items.length === 0) {
-    alert("Er zijn nog geen items om samen te vatten.");
+    alert("Er zijn geen zichtbare records om samen te vatten.");
     return;
   }
   if (!apiKey) {
@@ -175,7 +365,7 @@ document.getElementById("samenvattenBtn").addEventListener("click", async () => 
   const tekstBlok = items
     .map((i) => {
       const screenshotInfo = i.screenshot ? " [screenshot bewaard]" : "";
-      return `[${i.platform} · ${i.type || "tekst"} · ${new Date(i.datum).toLocaleDateString("nl-BE")}] ${i.tekst}${screenshotInfo}\nBron: ${i.bron || i.paginaUrl || ""}`;
+      return `[${project.naam} · ${i.platform} · ${i.type || "tekst"} · ${new Date(i.datum).toLocaleDateString("nl-BE")}] ${i.tekst}${screenshotInfo}\nBron: ${i.bron || i.paginaUrl || ""}`;
     })
     .join("\n\n");
 
@@ -215,5 +405,4 @@ document.getElementById("samenvattenBtn").addEventListener("click", async () => 
   }
 });
 
-laadItems();
-laadApiKey();
+laadState().then(renderAlles);

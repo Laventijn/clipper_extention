@@ -3,7 +3,7 @@
   "name": "Social opvolglijst",
   "version": "1.0",
   "description": "Verzamel tekst, links en screenshots via rechtsklik en laat ze samenvatten.",
-  "permissions": ["contextMenus", "storage", "downloads", "activeTab", "tabs", "scripting", "unlimitedStorage"],
+  "permissions": ["contextMenus", "storage", "downloads", "activeTab", "tabs", "scripting", "unlimitedStorage", "sidePanel"],
   "host_permissions": ["https://api.anthropic.com/*"],
   "background": {
     "service_worker": "background.js"
@@ -11,6 +11,9 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "Social opvolglijst"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
   },
   "icons": {
     "48": "icon.png"

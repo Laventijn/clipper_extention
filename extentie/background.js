@@ -17,11 +17,22 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "Maak screenshot voor opvolglijst",
     contexts: ["page", "selection", "link"]
   });
+
+  chrome.contextMenus.create({
+    id: "openZijbalk",
+    title: "Open opvolglijst in zijbalk",
+    contexts: ["page", "selection", "link"]
+  });
 });
 
 // Klik op het menu-item verwerken
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!tab?.url) return;
+
+  if (info.menuItemId === "openZijbalk") {
+    await chrome.sidePanel.open({ windowId: tab.windowId });
+    return;
+  }
 
   let nieuwItem = null;
 
@@ -53,20 +64,58 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   if (!nieuwItem) return;
 
-  const { items = [] } = await chrome.storage.local.get("items");
-  items.push(nieuwItem);
-  await chrome.storage.local.set({ items });
+  const state = await laadProjectState();
+  const project = state.projecten.find((p) => p.id === state.actiefProjectId) || state.projecten[0];
+  project.items.push(nieuwItem);
+  await chrome.storage.local.set({
+    projecten: state.projecten,
+    actiefProjectId: project.id,
+    items: []
+  });
 
   // Kleine visuele bevestiging via het extensie-icoon
-  chrome.action.setBadgeText({ text: String(items.length) });
+  const zichtbaarAantal = project.items.filter((item) => !item.verborgen).length;
+  chrome.action.setBadgeText({ text: String(zichtbaarAantal) });
   chrome.action.setBadgeBackgroundColor({ color: "#2e7d32" });
 });
+
+async function laadProjectState() {
+  const data = await chrome.storage.local.get(["projecten", "actiefProjectId", "items"]);
+  let projecten = Array.isArray(data.projecten) ? data.projecten : [];
+
+  if (projecten.length === 0) {
+    projecten = [
+      {
+        id: maakId(),
+        naam: "Algemeen",
+        items: Array.isArray(data.items) ? data.items : []
+      }
+    ];
+  }
+
+  projecten = projecten.map((project) => ({
+    id: project.id || maakId(),
+    naam: project.naam || "Naamloos project",
+    items: Array.isArray(project.items) ? project.items : []
+  }));
+
+  const actiefProjectId = projecten.some((project) => project.id === data.actiefProjectId)
+    ? data.actiefProjectId
+    : projecten[0].id;
+
+  return { projecten, actiefProjectId };
+}
+
+function maakId() {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 function maakBasisItem(tab, extra) {
   const bron = extra.bron || tab.url || "";
 
   return {
     type: extra.type,
+    id: maakId(),
     tekst: extra.tekst,
     bron,
     paginaUrl: tab.url || "",
