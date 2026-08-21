@@ -1,3 +1,8 @@
+// Klik op het extensie-icoontje opent meteen de zijbalk, geen popup
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch((error) => console.error(error));
+
 // Rechtsklik-menu-items aanmaken zodra de extensie start
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -17,30 +22,21 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "Maak screenshot voor opvolglijst",
     contexts: ["page", "selection", "link"]
   });
-
-  chrome.contextMenus.create({
-    id: "openZijbalk",
-    title: "Open opvolglijst in zijbalk",
-    contexts: ["page", "selection", "link"]
-  });
 });
 
 // Klik op het menu-item verwerken
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!tab?.url) return;
 
-  if (info.menuItemId === "openZijbalk") {
-    await chrome.sidePanel.open({ windowId: tab.windowId });
-    return;
-  }
-
+  const meta = await haalPaginaMeta(tab.id);
   let nieuwItem = null;
 
   if (info.menuItemId === "voegSelectieToeAanOpvolglijst" && info.selectionText) {
     nieuwItem = maakBasisItem(tab, {
       type: "tekst",
       tekst: info.selectionText.trim(),
-      bron: tab.url
+      bron: tab.url,
+      meta
     });
   }
 
@@ -48,7 +44,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     nieuwItem = maakBasisItem(tab, {
       type: "link",
       tekst: info.linkText || info.linkUrl,
-      bron: info.linkUrl
+      bron: info.linkUrl,
+      meta
     });
   }
 
@@ -58,7 +55,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       type: "screenshot",
       tekst: info.selectionText?.trim() || tab.title || tab.url,
       bron: tab.url,
-      screenshot
+      screenshot,
+      meta
     });
   }
 
@@ -112,6 +110,7 @@ function maakId() {
 
 function maakBasisItem(tab, extra) {
   const bron = extra.bron || tab.url || "";
+  const meta = extra.meta || {};
 
   return {
     type: extra.type,
@@ -120,10 +119,41 @@ function maakBasisItem(tab, extra) {
     bron,
     paginaUrl: tab.url || "",
     paginaTitel: tab.title || "",
+    beschrijving: meta.beschrijving || "",
+    siteNaam: meta.siteNaam || "",
+    auteur: meta.auteur || "",
+    gepubliceerdOp: meta.gepubliceerdOp || "",
+    taal: meta.taal || "",
     platform: detecteerPlatform(bron || tab.url || ""),
     datum: new Date().toISOString(),
     verwerkt: false,
     screenshot: extra.screenshot || ""
+  };
+}
+
+async function haalPaginaMeta(tabId) {
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: verzamelPaginaMeta
+    });
+    return result?.result || {};
+  } catch (err) {
+    console.warn("Paginametadata kon niet opgehaald worden", err);
+    return {};
+  }
+}
+
+function verzamelPaginaMeta() {
+  const metaNaam = (naam) => document.querySelector(`meta[name="${naam}"]`)?.content || "";
+  const metaProp = (prop) => document.querySelector(`meta[property="${prop}"]`)?.content || "";
+
+  return {
+    beschrijving: metaProp("og:description") || metaNaam("description") || "",
+    siteNaam: metaProp("og:site_name") || "",
+    auteur: metaNaam("author") || metaProp("article:author") || "",
+    gepubliceerdOp: metaProp("article:published_time") || metaNaam("date") || "",
+    taal: document.documentElement.lang || ""
   };
 }
 

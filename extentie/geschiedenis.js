@@ -1,6 +1,4 @@
 const periodeSelect = document.getElementById("periodeSelect");
-const vanafRij = document.getElementById("vanafRij");
-const totRij = document.getElementById("totRij");
 const vanafDatumEl = document.getElementById("vanafDatum");
 const totDatumEl = document.getElementById("totDatum");
 const laadBtn = document.getElementById("laadBtn");
@@ -26,28 +24,42 @@ let tags = {};
 async function init() {
   const opgeslagen = await chrome.storage.local.get(["geschiedenisTags"]);
   tags = opgeslagen.geschiedenisTags || {};
+  vulPeriodeVelden(periodeSelect.value);
+}
+
+function naarDatetimeLocalString(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function vulPeriodeVelden(waarde) {
+  const nu = new Date();
+
+  if (waarde === "vandaag") {
+    const start = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate());
+    vanafDatumEl.value = naarDatetimeLocalString(start);
+    totDatumEl.value = naarDatetimeLocalString(nu);
+    return;
+  }
+
+  if (waarde === "gisteren") {
+    const startGisteren = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate() - 1);
+    const eindeGisteren = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate());
+    vanafDatumEl.value = naarDatetimeLocalString(startGisteren);
+    totDatumEl.value = naarDatetimeLocalString(eindeGisteren);
+    return;
+  }
+
+  // Aangepast bereik: laat de huidige waarden staan, of vul een standaard in als ze nog leeg zijn.
+  if (!vanafDatumEl.value) vanafDatumEl.value = naarDatetimeLocalString(new Date(nu.getFullYear(), nu.getMonth(), nu.getDate()));
+  if (!totDatumEl.value) totDatumEl.value = naarDatetimeLocalString(nu);
 }
 
 periodeSelect.addEventListener("change", () => {
-  const aangepast = periodeSelect.value === "aangepast";
-  vanafRij.hidden = !aangepast;
-  totRij.hidden = !aangepast;
+  vulPeriodeVelden(periodeSelect.value);
 });
 
 function bepaalPeriode() {
-  const nu = new Date();
-
-  if (periodeSelect.value === "vandaag") {
-    const start = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate());
-    return { startTime: start.getTime(), endTime: nu.getTime() };
-  }
-
-  if (periodeSelect.value === "gisteren") {
-    const startGisteren = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate() - 1);
-    const eindeGisteren = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate());
-    return { startTime: startGisteren.getTime(), endTime: eindeGisteren.getTime() };
-  }
-
   const vanaf = vanafDatumEl.value ? new Date(vanafDatumEl.value) : null;
   const tot = totDatumEl.value ? new Date(totDatumEl.value) : null;
 
@@ -55,8 +67,7 @@ function bepaalPeriode() {
     return null;
   }
 
-  const eindDatum = new Date(tot.getFullYear(), tot.getMonth(), tot.getDate() + 1);
-  return { startTime: vanaf.getTime(), endTime: eindDatum.getTime() };
+  return { startTime: vanaf.getTime(), endTime: tot.getTime() };
 }
 
 laadBtn.addEventListener("click", async () => {
@@ -199,7 +210,7 @@ async function haalApiKeyOp() {
   return data.apiKey || "";
 }
 
-async function roepAnthropicApiAan(apiKey, prompt) {
+async function roepAnthropicApiAan(apiKey, prompt, maxTokens = 4096) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -210,14 +221,26 @@ async function roepAnthropicApiAan(apiKey, prompt) {
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 1500,
+      max_tokens: maxTokens,
       messages: [{ role: "user", content: prompt }]
     })
   });
 
   const data = await response.json();
   if (data.error) throw new Error(data.error.message);
-  return data.content.map((b) => b.text || "").join("\n");
+  return {
+    tekst: data.content.map((b) => b.text || "").join("\n"),
+    afgekapt: data.stop_reason === "max_tokens"
+  };
+}
+
+function toonAfkapWaarschuwing(container, aantalItems) {
+  const waarschuwing = document.createElement("div");
+  waarschuwing.className = "waarschuwing";
+  waarschuwing.textContent =
+    `Let op: het antwoord van de AI werd afgekapt (te veel geselecteerde items: ${aantalItems}). ` +
+    "Maak een kleinere selectie of verwerk de geschiedenis in meerdere delen voor een volledig resultaat.";
+  container.prepend(waarschuwing);
 }
 
 groepeerAutoBtn.addEventListener("click", async () => {
@@ -248,33 +271,56 @@ groepeerAutoBtn.addEventListener("click", async () => {
     lijstTekst;
 
   try {
-    const antwoord = await roepAnthropicApiAan(apiKey, prompt);
-    toonRuweGroepering(antwoord);
+    const { tekst, afgekapt } = await roepAnthropicApiAan(apiKey, prompt, 8192);
+    toonRuweGroepering(tekst);
+    if (afgekapt) toonAfkapWaarschuwing(resultaatEl, items.length);
   } catch (err) {
     resultaatEl.innerHTML = `<div class="leeg">Fout bij groeperen: ${escapeHtml(err.message)}</div>`;
   }
 });
 
+function maakGroepElement(titel, aantal, itemsHtml) {
+  const groep = document.createElement("div");
+  groep.className = "groep";
+  groep.innerHTML = `
+    <div class="groepTitel">
+      <span>${escapeHtml(titel)}${aantal != null ? ` (${aantal})` : ""}</span>
+      <span class="toggleIcon">verberg</span>
+    </div>
+    <div class="groepBody">${itemsHtml}</div>
+  `;
+  return groep;
+}
+
 function toonRuweGroepering(tekst) {
   resultaatEl.innerHTML = "";
   const blokken = tekst.split(/\n(?=ONDERWERP:)/i);
+  let ietsGetoond = false;
 
   blokken.forEach((blok) => {
     const regels = blok.trim().split("\n").filter(Boolean);
     if (regels.length === 0) return;
 
     const kop = regels[0].replace(/^ONDERWERP:\s*/i, "").trim() || "Onderwerp";
-    const groep = document.createElement("div");
-    groep.className = "groep";
     const items = regels.slice(1).map((regel) => `<div class="groepItem">${escapeHtml(regel.replace(/^-+\s*/, ""))}</div>`).join("");
-    groep.innerHTML = `<div class="groepTitel">${escapeHtml(kop)}</div>${items}`;
-    resultaatEl.appendChild(groep);
+    resultaatEl.appendChild(maakGroepElement(kop, null, items));
+    ietsGetoond = true;
   });
 
-  if (resultaatEl.innerHTML === "") {
+  if (!ietsGetoond) {
     resultaatEl.innerHTML = `<pre>${escapeHtml(tekst)}</pre>`;
   }
 }
+
+resultaatEl.addEventListener("click", (event) => {
+  const titelRij = event.target.closest(".groepTitel");
+  if (!titelRij) return;
+
+  const groep = titelRij.closest(".groep");
+  groep.classList.toggle("dicht");
+  const icoon = titelRij.querySelector(".toggleIcon");
+  if (icoon) icoon.textContent = groep.classList.contains("dicht") ? "toon" : "verberg";
+});
 
 groepeerTagBtn.addEventListener("click", () => {
   const items = geselecteerdeItems();
@@ -296,13 +342,10 @@ groepeerTagBtn.addEventListener("click", () => {
   Array.from(groepen.entries())
     .sort((a, b) => (a[0] === "Zonder label" ? 1 : b[0] === "Zonder label" ? -1 : a[0].localeCompare(b[0])))
     .forEach(([naam, groepItems]) => {
-      const groep = document.createElement("div");
-      groep.className = "groep";
       const itemsHtml = groepItems
         .map((i) => `<div class="groepItem"><span class="tijd">${escapeHtml(i.tijdstip)}</span>${escapeHtml(i.titel)}</div>`)
         .join("");
-      groep.innerHTML = `<div class="groepTitel">${escapeHtml(naam)} (${groepItems.length})</div>${itemsHtml}`;
-      resultaatEl.appendChild(groep);
+      resultaatEl.appendChild(maakGroepElement(naam, groepItems.length, itemsHtml));
     });
 });
 
@@ -334,8 +377,10 @@ rapportBtn.addEventListener("click", async () => {
     lijstTekst;
 
   try {
-    const rapport = await roepAnthropicApiAan(apiKey, prompt);
-    rapportTekstEl.textContent = rapport;
+    const { tekst, afgekapt } = await roepAnthropicApiAan(apiKey, prompt, 4096);
+    rapportTekstEl.textContent = afgekapt
+      ? tekst + "\n\n[Let op: dit rapport werd afgekapt door te veel geselecteerde items. Maak een kleinere selectie voor een volledig rapport.]"
+      : tekst;
   } catch (err) {
     rapportTekstEl.textContent = "Fout bij genereren van rapport: " + err.message;
   }

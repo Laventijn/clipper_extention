@@ -8,8 +8,19 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["selectiepopup.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://www.youtube.com/watch*", "*://m.youtube.com/watch*"],
+      "js": ["youtube-transcript.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "action": {
-    "default_popup": "popup.html",
     "default_title": "Social opvolglijst"
   },
   "side_panel": {

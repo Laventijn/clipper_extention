@@ -7,8 +7,6 @@ const hernoemProjectBtn = document.getElementById("hernoemProjectBtn");
 const projectNaamRijEl = document.getElementById("projectNaamRij");
 const projectNaamEl = document.getElementById("projectNaam");
 const bewaarProjectNaamBtn = document.getElementById("bewaarProjectNaamBtn");
-const toonVerborgenEl = document.getElementById("toonVerborgen");
-const openZijbalkBtn = document.getElementById("openZijbalkBtn");
 const openGeschiedenisBtn = document.getElementById("openGeschiedenisBtn");
 const voegPaginaBtn = document.getElementById("voegPaginaBtn");
 const isChromeExtension = Boolean(globalThis.chrome?.storage?.local);
@@ -65,8 +63,7 @@ function maakStorage() {
       JSON.parse(localStorage.getItem("preview-projecten") || "null") ||
       [{ id: maakId(), naam: "Algemeen", items: previewItems }],
     actiefProjectId: localStorage.getItem("preview-actief-project-id") || "",
-    apiKey: localStorage.getItem("preview-api-key") || "",
-    toonVerborgen: localStorage.getItem("preview-toon-verborgen") === "true"
+    apiKey: localStorage.getItem("preview-api-key") || ""
   };
 
   if (!beginData.actiefProjectId || !beginData.projecten.some((p) => p.id === beginData.actiefProjectId)) {
@@ -84,13 +81,11 @@ function maakStorage() {
       if ("projecten" in data) localStorage.setItem("preview-projecten", JSON.stringify(data.projecten));
       if ("actiefProjectId" in data) localStorage.setItem("preview-actief-project-id", data.actiefProjectId);
       if ("apiKey" in data) localStorage.setItem("preview-api-key", data.apiKey);
-      if ("toonVerborgen" in data) localStorage.setItem("preview-toon-verborgen", String(data.toonVerborgen));
     }
   };
 }
 
-async function laadState() {
-  const data = await storage.get(["projecten", "actiefProjectId", "items", "apiKey", "toonVerborgen"]);
+function normaliseerState(data) {
   let projecten = Array.isArray(data.projecten) ? data.projecten : [];
 
   if (projecten.length === 0) {
@@ -113,14 +108,23 @@ async function laadState() {
     ? data.actiefProjectId
     : projecten[0].id;
 
-  state = {
+  return {
     projecten,
     actiefProjectId,
-    apiKey: data.apiKey || "",
-    toonVerborgen: Boolean(data.toonVerborgen)
+    apiKey: data.apiKey || ""
   };
+}
 
+async function laadState() {
+  const data = await storage.get(["projecten", "actiefProjectId", "items", "apiKey"]);
+  state = normaliseerState(data);
   await bewaarState();
+}
+
+async function ververs() {
+  const data = await storage.get(["projecten", "actiefProjectId", "items", "apiKey"]);
+  state = normaliseerState(data);
+  renderAlles();
 }
 
 function normaliseerItem(item) {
@@ -137,7 +141,6 @@ async function bewaarState() {
     projecten: state.projecten,
     actiefProjectId: state.actiefProjectId,
     apiKey: state.apiKey,
-    toonVerborgen: state.toonVerborgen,
     items: []
   });
   await updateBadge();
@@ -147,15 +150,14 @@ function actiefProject() {
   return state.projecten.find((project) => project.id === state.actiefProjectId) || state.projecten[0];
 }
 
-function zichtbareItems(project = actiefProject()) {
-  return project.items.filter((item) => state.toonVerborgen || !item.verborgen);
+function projectItems(project = actiefProject()) {
+  return project.items;
 }
 
 function renderAlles() {
   renderProjecten();
   laadItems();
-  apiKeyEl.value = state.apiKey;
-  toonVerborgenEl.checked = state.toonVerborgen;
+  if (document.activeElement !== apiKeyEl) apiKeyEl.value = state.apiKey;
 }
 
 function renderProjecten() {
@@ -163,18 +165,18 @@ function renderProjecten() {
   state.projecten.forEach((project) => {
     const option = document.createElement("option");
     option.value = project.id;
-    option.textContent = `${project.naam} (${project.items.filter((item) => !item.verborgen).length})`;
+    option.textContent = `${project.naam} (${project.items.length})`;
     projectSelectEl.appendChild(option);
   });
   projectSelectEl.value = state.actiefProjectId;
 }
 
 function laadItems() {
-  const items = zichtbareItems();
+  const items = projectItems();
   lijstEl.innerHTML = "";
 
   if (items.length === 0) {
-    lijstEl.innerHTML = '<div class="leeg">Geen zichtbare records in dit project.</div>';
+    lijstEl.innerHTML = '<div class="leeg">Geen records in dit project.</div>';
     return;
   }
 
@@ -184,16 +186,35 @@ function laadItems() {
     const datum = new Date(item.datum).toLocaleString("nl-BE");
     const bron = item.bron || item.paginaUrl || "";
     const type = item.type || "tekst";
+    const extraMeta = [item.siteNaam, item.auteur, item.taal].filter(Boolean).map(escapeHtml).join(" · ");
+    const titelRegel = item.paginaTitel ? `<div class="paginaTitel">${escapeHtml(item.paginaTitel)}</div>` : "";
+    const gepubliceerd = item.gepubliceerdOp ? formatteerGepubliceerdOp(item.gepubliceerdOp) : "";
+
+    const inhoud = item.verborgen
+      ? ""
+      : `
+        <div class="tekst">${escapeHtml(item.tekst || "")}</div>
+        ${item.beschrijving ? `<div class="beschrijving">${escapeHtml(item.beschrijving)}</div>` : ""}
+        ${bron ? `<div class="bron"><a href="${escapeAttr(bron)}" target="_blank" rel="noreferrer">Open bron</a><br>${escapeHtml(korteUrl(bron))}</div>` : ""}
+        ${item.screenshot ? `<img class="screenshot" src="${escapeAttr(item.screenshot)}" alt="Screenshot van bronpagina">` : ""}
+      `;
 
     div.innerHTML = `
-      <div class="meta">${escapeHtml(item.platform || "Onbekend")} · ${datum} · ${escapeHtml(type)}</div>
-      <div class="tekst">${escapeHtml(item.tekst || "")}</div>
-      ${bron ? `<div class="bron"><a href="${escapeAttr(bron)}" target="_blank" rel="noreferrer">Open bron</a><br>${escapeHtml(korteUrl(bron))}</div>` : ""}
-      ${item.screenshot ? `<img class="screenshot" src="${escapeAttr(item.screenshot)}" alt="Screenshot van bronpagina">` : ""}
-      <div class="itemActies">
-        <button data-actie="${item.verborgen ? "toon" : "verberg"}" data-id="${escapeAttr(item.id)}">${item.verborgen ? "Toon" : "Verberg"}</button>
-        <button data-actie="verwijder" data-id="${escapeAttr(item.id)}">Verwijder</button>
+      <div class="itemKop">
+        <button type="button" class="icoonKnop" data-actie="wissel" data-id="${escapeAttr(item.id)}" title="${item.verborgen ? "Uitklappen" : "Inklappen"}" aria-label="${item.verborgen ? "Uitklappen" : "Inklappen"}">${item.verborgen ? "+" : "−"}</button>
+        <div class="meta">${escapeHtml(item.platform || "Onbekend")} · ${datum} · ${escapeHtml(type)}${extraMeta ? ` · ${extraMeta}` : ""}${gepubliceerd ? ` · gepubliceerd ${escapeHtml(gepubliceerd)}` : ""}</div>
+        <button type="button" class="icoonKnop vuilbak" data-actie="verwijder" data-id="${escapeAttr(item.id)}" title="Verwijderen" aria-label="Verwijderen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </button>
       </div>
+      ${titelRegel}
+      ${inhoud}
     `;
     lijstEl.appendChild(div);
   });
@@ -207,6 +228,11 @@ function escapeHtml(tekst) {
 
 function escapeAttr(tekst) {
   return escapeHtml(String(tekst)).replace(/"/g, "&quot;");
+}
+
+function formatteerGepubliceerdOp(waarde) {
+  const datum = new Date(waarde);
+  return Number.isNaN(datum.getTime()) ? waarde : datum.toLocaleDateString("nl-BE");
 }
 
 function korteUrl(url) {
@@ -264,16 +290,24 @@ function verzamelZichtbarePaginaTekst() {
     if (tekst && delen[delen.length - 1] !== tekst) delen.push(tekst);
   }
 
+  const metaNaam = (naam) => document.querySelector(`meta[name="${naam}"]`)?.content || "";
+  const metaProp = (prop) => document.querySelector(`meta[property="${prop}"]`)?.content || "";
+
   return {
     titel: document.title,
     url: location.href,
-    tekst: delen.join("\n").slice(0, 60000)
+    tekst: delen.join("\n").slice(0, 60000),
+    beschrijving: metaProp("og:description") || metaNaam("description") || "",
+    siteNaam: metaProp("og:site_name") || "",
+    auteur: metaNaam("author") || metaProp("article:author") || "",
+    gepubliceerdOp: metaProp("article:published_time") || metaNaam("date") || "",
+    taal: document.documentElement.lang || ""
   };
 }
 
 async function updateBadge() {
   if (!isChromeExtension) return;
-  const aantal = actiefProject().items.filter((item) => !item.verborgen).length;
+  const aantal = actiefProject().items.length;
   await chrome.action.setBadgeText({ text: aantal ? String(aantal) : "" });
   await chrome.action.setBadgeBackgroundColor({ color: "#2e7d32" });
 }
@@ -318,12 +352,6 @@ bewaarProjectNaamBtn.addEventListener("click", async () => {
   renderAlles();
 });
 
-openZijbalkBtn.addEventListener("click", async () => {
-  if (!globalThis.chrome?.sidePanel) return;
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  await chrome.sidePanel.open({ windowId: tab.windowId });
-});
-
 openGeschiedenisBtn.addEventListener("click", () => {
   if (!globalThis.chrome?.tabs) {
     alert("Deze functie werkt alleen in de geladen Chrome-extensie.");
@@ -360,6 +388,11 @@ voegPaginaBtn.addEventListener("click", async () => {
       bron: pagina.url || tab.url,
       paginaUrl: pagina.url || tab.url,
       paginaTitel: pagina.titel || tab.title || "",
+      beschrijving: pagina.beschrijving || "",
+      siteNaam: pagina.siteNaam || "",
+      auteur: pagina.auteur || "",
+      gepubliceerdOp: pagina.gepubliceerdOp || "",
+      taal: pagina.taal || "",
       platform: detecteerPlatform(pagina.url || tab.url),
       datum: new Date().toISOString(),
       verwerkt: false,
@@ -374,12 +407,6 @@ voegPaginaBtn.addEventListener("click", async () => {
   }
 });
 
-toonVerborgenEl.addEventListener("change", async () => {
-  state.toonVerborgen = toonVerborgenEl.checked;
-  await bewaarState();
-  renderAlles();
-});
-
 lijstEl.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-actie]");
   if (!button) return;
@@ -391,8 +418,8 @@ lijstEl.addEventListener("click", async (event) => {
   if (button.dataset.actie === "verwijder") {
     if (!confirm("Dit record definitief verwijderen?")) return;
     project.items = project.items.filter((record) => record.id !== item.id);
-  } else {
-    item.verborgen = button.dataset.actie === "verberg";
+  } else if (button.dataset.actie === "wissel") {
+    item.verborgen = !item.verborgen;
   }
 
   await bewaarState();
@@ -401,10 +428,10 @@ lijstEl.addEventListener("click", async (event) => {
 
 document.getElementById("wisBtn").addEventListener("click", async () => {
   const project = actiefProject();
-  if (!confirm(`Alle zichtbare records in "${project.naam}" verbergen? Het project blijft bewaard.`)) return;
+  if (!confirm(`Alle records in "${project.naam}" minimaliseren?`)) return;
 
   project.items.forEach((item) => {
-    if (!item.verborgen) item.verborgen = true;
+    item.verborgen = true;
   });
   await bewaarState();
   renderAlles();
@@ -412,10 +439,27 @@ document.getElementById("wisBtn").addEventListener("click", async () => {
 
 document.getElementById("exportBtn").addEventListener("click", async () => {
   const project = actiefProject();
-  const items = zichtbareItems(project);
+  const items = projectItems(project);
   if (items.length === 0) return;
 
-  const rijen = [["project", "verborgen", "type", "platform", "datum", "bron", "paginatitel", "tekst", "heeft_screenshot"]];
+  const rijen = [
+    [
+      "project",
+      "geminimaliseerd",
+      "type",
+      "platform",
+      "datum",
+      "bron",
+      "paginatitel",
+      "sitenaam",
+      "auteur",
+      "gepubliceerd_op",
+      "taal",
+      "beschrijving",
+      "tekst",
+      "heeft_screenshot"
+    ]
+  ];
   items.forEach((i) =>
     rijen.push([
       project.naam,
@@ -425,6 +469,11 @@ document.getElementById("exportBtn").addEventListener("click", async () => {
       i.datum,
       i.bron,
       i.paginaTitel || "",
+      i.siteNaam || "",
+      i.auteur || "",
+      i.gepubliceerdOp || "",
+      i.taal || "",
+      (i.beschrijving || "").replace(/\n/g, " "),
       (i.tekst || "").replace(/\n/g, " "),
       i.screenshot ? "ja" : "nee"
     ])
@@ -446,13 +495,74 @@ document.getElementById("exportBtn").addEventListener("click", async () => {
   URL.revokeObjectURL(url);
 });
 
+function bouwProjectTekstBlok(project, items) {
+  return items
+    .map((i) => {
+      const screenshotInfo = i.screenshot ? " [screenshot bewaard]" : "";
+      return `[${project.naam} · ${i.platform} · ${i.type || "tekst"} · ${new Date(i.datum).toLocaleDateString("nl-BE")}] ${i.tekst}${screenshotInfo}\nBron: ${i.bron || i.paginaUrl || ""}`;
+    })
+    .join("\n\n");
+}
+
+async function kopieerTekstMetFeedback(tekst, knop) {
+  const oorspronkelijkeLabel = knop.textContent;
+  try {
+    await navigator.clipboard.writeText(tekst);
+    knop.textContent = "Gekopieerd!";
+  } catch {
+    knop.textContent = "Mislukt";
+  }
+  setTimeout(() => {
+    knop.textContent = oorspronkelijkeLabel;
+  }, 1500);
+}
+
+document.getElementById("kopieerProjectBtn").addEventListener("click", async (event) => {
+  const project = actiefProject();
+  const items = projectItems(project);
+
+  if (items.length === 0) {
+    alert("Er zijn geen records om te kopiëren.");
+    return;
+  }
+
+  const tekstBlok = bouwProjectTekstBlok(project, items);
+  await kopieerTekstMetFeedback(tekstBlok, event.currentTarget);
+});
+
+const kopieerSamenvattingBtn = document.getElementById("kopieerSamenvattingBtn");
+const downloadSamenvattingBtn = document.getElementById("downloadSamenvattingBtn");
+const samenvattingActiesEl = document.getElementById("samenvattingActies");
+
+kopieerSamenvattingBtn.addEventListener("click", async (event) => {
+  await kopieerTekstMetFeedback(samenvattingEl.textContent, event.currentTarget);
+});
+
+downloadSamenvattingBtn.addEventListener("click", () => {
+  const project = actiefProject();
+  const blob = new Blob([samenvattingEl.textContent], { type: "text/plain;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const bestandsnaam = `samenvatting-${project.naam.replace(/[\\/:*?"<>|]+/g, "-") || "project"}.txt`;
+
+  if (globalThis.chrome?.downloads) {
+    chrome.downloads.download({ url, filename: bestandsnaam });
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = bestandsnaam;
+  link.click();
+  URL.revokeObjectURL(url);
+});
+
 document.getElementById("samenvattenBtn").addEventListener("click", async () => {
   const project = actiefProject();
-  const items = zichtbareItems(project);
+  const items = projectItems(project);
   const apiKey = state.apiKey;
 
   if (items.length === 0) {
-    alert("Er zijn geen zichtbare records om samen te vatten.");
+    alert("Er zijn geen records om samen te vatten.");
     return;
   }
   if (!apiKey) {
@@ -462,13 +572,9 @@ document.getElementById("samenvattenBtn").addEventListener("click", async () => 
 
   samenvattingEl.style.display = "block";
   samenvattingEl.textContent = "Bezig met samenvatten...";
+  samenvattingActiesEl.hidden = false;
 
-  const tekstBlok = items
-    .map((i) => {
-      const screenshotInfo = i.screenshot ? " [screenshot bewaard]" : "";
-      return `[${project.naam} · ${i.platform} · ${i.type || "tekst"} · ${new Date(i.datum).toLocaleDateString("nl-BE")}] ${i.tekst}${screenshotInfo}\nBron: ${i.bron || i.paginaUrl || ""}`;
-    })
-    .join("\n\n");
+  const tekstBlok = bouwProjectTekstBlok(project, items);
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -505,5 +611,12 @@ document.getElementById("samenvattenBtn").addEventListener("click", async () => 
     samenvattingEl.textContent = "Er ging iets mis: " + err.message;
   }
 });
+
+if (isChromeExtension) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local" || !state) return;
+    ververs();
+  });
+}
 
 laadState().then(renderAlles);

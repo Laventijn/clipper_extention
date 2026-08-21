@@ -19,11 +19,16 @@
   select, input[type=text] { width: 100%; box-sizing: border-box; padding: 5px; font-size: 12px; }
   #lijst { max-height: 260px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; }
   .item { padding: 8px; border-bottom: 1px solid #eee; font-size: 12px; }
-  .item.verborgen { opacity: 0.55; background: #f8f8f8; }
+  .item.verborgen { background: #f8f8f8; }
   .item:last-child { border-bottom: none; }
-  .meta { color: #777; font-size: 11px; margin-bottom: 3px; }
-  .itemActies { display: flex; gap: 6px; margin-top: 8px; }
-  .itemActies button { flex: 0 0 auto; padding: 4px 7px; }
+  .itemKop { display: flex; align-items: center; gap: 5px; }
+  .meta { flex: 1; color: #777; font-size: 11px; overflow-wrap: anywhere; }
+  .icoonKnop { flex: none; width: auto; padding: 2px 7px; font-size: 12px; line-height: 1.4; border: 1px solid #ccc; background: #f5f5f5; color: #333; border-radius: 4px; cursor: pointer; }
+  .icoonKnop:hover { background: #e9e9e9; }
+  .icoonKnop.vuilbak { padding: 4px 6px; display: flex; align-items: center; }
+  .icoonKnop.vuilbak svg { width: 12px; height: 12px; display: block; }
+  .paginaTitel { font-weight: 600; margin-top: 4px; margin-bottom: 3px; overflow-wrap: anywhere; }
+  .beschrijving { color: #666; font-size: 11px; font-style: italic; margin-top: 4px; overflow-wrap: anywhere; }
   .tekst { line-height: 1.35; overflow-wrap: anywhere; }
   .bron { margin-top: 6px; font-size: 11px; overflow-wrap: anywhere; }
   .bron a { color: #0f5db8; text-decoration: none; }
@@ -31,8 +36,9 @@
   .screenshot { display: block; width: 100%; margin-top: 8px; border: 1px solid #ddd; border-radius: 4px; }
   .knoppen { margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   button { flex: 1; padding: 6px; font-size: 12px; cursor: pointer; }
-  .opties { margin-top: 8px; font-size: 11px; }
   #samenvatting { margin-top: 10px; font-size: 12px; white-space: pre-wrap; background: #f7f7f7; padding: 8px; border-radius: 6px; display: none; }
+  .samenvattingActies { margin-top: 6px; display: flex; gap: 6px; }
+  .samenvattingActies[hidden] { display: none; }
   #apiKeyRij { margin-top: 10px; font-size: 11px; }
   input[type=password] { width: 100%; box-sizing: border-box; padding: 4px; font-size: 11px; }
   .leeg { padding: 12px; color: #999; font-size: 12px; text-align: center; }
@@ -59,17 +65,17 @@
   <div class="knoppen">
     <button id="voegPaginaBtn">Voeg pagina toe</button>
     <button id="samenvattenBtn">Samenvatten met AI</button>
+    <button id="kopieerProjectBtn">Kopieer projecttekst</button>
     <button id="exportBtn">Exporteer CSV</button>
-    <button id="wisBtn">Wis lijst</button>
-    <button id="openZijbalkBtn">Zijbalk</button>
+    <button id="wisBtn">Minimaliseer alles</button>
     <button id="openGeschiedenisBtn">Open geschiedenisrapport</button>
   </div>
-  <label class="opties">
-    <input type="checkbox" id="toonVerborgen" />
-    Verborgen records tonen
-  </label>
 
   <div id="samenvatting"></div>
+  <div class="samenvattingActies" id="samenvattingActies" hidden>
+    <button id="kopieerSamenvattingBtn">Kopieer</button>
+    <button id="downloadSamenvattingBtn">Download als tekstbestand</button>
+  </div>
 
   <div id="apiKeyRij">
     <label>Anthropic API-key (blijft lokaal opgeslagen):</label>

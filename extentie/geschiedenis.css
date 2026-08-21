@@ -147,15 +147,46 @@ button:hover {
 
 #resultaat {
   font-size: 13px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 #resultaat .groep {
-  margin-bottom: 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  overflow: hidden;
 }
 
 #resultaat .groepTitel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #f2f2f2;
   font-weight: 700;
-  margin-bottom: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+#resultaat .groepTitel:hover {
+  background: #e9e9e9;
+}
+
+#resultaat .groepTitel .toggleIcon {
+  font-size: 11px;
+  color: #666;
+  font-weight: 400;
+}
+
+#resultaat .groepBody {
+  padding: 8px 10px;
+}
+
+#resultaat .groep.dicht .groepBody {
+  display: none;
 }
 
 #resultaat .groepItem {
@@ -168,6 +199,16 @@ button:hover {
   color: #888;
   font-size: 11px;
   margin-right: 6px;
+}
+
+#resultaat .waarschuwing {
+  background: #fff4e5;
+  border: 1px solid #f0c36d;
+  color: #7a5200;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
 }
 
 #rapportBlok {
