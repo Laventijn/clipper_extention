@@ -9,6 +9,8 @@ const projectNaamEl = document.getElementById("projectNaam");
 const bewaarProjectNaamBtn = document.getElementById("bewaarProjectNaamBtn");
 const toonVerborgenEl = document.getElementById("toonVerborgen");
 const openZijbalkBtn = document.getElementById("openZijbalkBtn");
+const openGeschiedenisBtn = document.getElementById("openGeschiedenisBtn");
+const voegPaginaBtn = document.getElementById("voegPaginaBtn");
 const isChromeExtension = Boolean(globalThis.chrome?.storage?.local);
 const storage = maakStorage();
 
@@ -220,6 +222,55 @@ function maakId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function detecteerPlatform(url) {
+  if (url.includes("facebook.com")) return "Facebook";
+  if (url.includes("linkedin.com")) return "LinkedIn";
+
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "Onbekend";
+  }
+}
+
+function verzamelZichtbarePaginaTekst() {
+  const blokkeerTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "SVG", "CANVAS"]);
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const tekst = node.nodeValue.trim();
+      if (!tekst) return NodeFilter.FILTER_REJECT;
+      if (blokkeerTags.has(node.parentElement?.tagName)) return NodeFilter.FILTER_REJECT;
+
+      const element = node.parentElement;
+      const stijl = window.getComputedStyle(element);
+      if (stijl.visibility === "hidden" || stijl.display === "none") return NodeFilter.FILTER_REJECT;
+
+      const rect = element.getBoundingClientRect();
+      const zichtbaar =
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.bottom >= 0 &&
+        rect.right >= 0 &&
+        rect.top <= window.innerHeight &&
+        rect.left <= window.innerWidth;
+
+      return zichtbaar ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+
+  const delen = [];
+  while (walker.nextNode()) {
+    const tekst = walker.currentNode.nodeValue.replace(/\s+/g, " ").trim();
+    if (tekst && delen[delen.length - 1] !== tekst) delen.push(tekst);
+  }
+
+  return {
+    titel: document.title,
+    url: location.href,
+    tekst: delen.join("\n").slice(0, 60000)
+  };
+}
+
 async function updateBadge() {
   if (!isChromeExtension) return;
   const aantal = actiefProject().items.filter((item) => !item.verborgen).length;
@@ -271,6 +322,56 @@ openZijbalkBtn.addEventListener("click", async () => {
   if (!globalThis.chrome?.sidePanel) return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   await chrome.sidePanel.open({ windowId: tab.windowId });
+});
+
+openGeschiedenisBtn.addEventListener("click", () => {
+  if (!globalThis.chrome?.tabs) {
+    alert("Deze functie werkt alleen in de geladen Chrome-extensie.");
+    return;
+  }
+  chrome.tabs.create({ url: chrome.runtime.getURL("geschiedenis.html") });
+});
+
+voegPaginaBtn.addEventListener("click", async () => {
+  if (!globalThis.chrome?.scripting) {
+    alert("Deze functie werkt alleen in de geladen Chrome-extensie.");
+    return;
+  }
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !tab.url) return;
+
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: verzamelZichtbarePaginaTekst
+    });
+    const pagina = result?.result;
+
+    if (!pagina?.tekst) {
+      alert("Geen zichtbare tekst gevonden op deze pagina.");
+      return;
+    }
+
+    actiefProject().items.push({
+      id: maakId(),
+      type: "pagina",
+      tekst: pagina.tekst,
+      bron: pagina.url || tab.url,
+      paginaUrl: pagina.url || tab.url,
+      paginaTitel: pagina.titel || tab.title || "",
+      platform: detecteerPlatform(pagina.url || tab.url),
+      datum: new Date().toISOString(),
+      verwerkt: false,
+      verborgen: false,
+      screenshot: ""
+    });
+
+    await bewaarState();
+    renderAlles();
+  } catch (err) {
+    alert("De zichtbare tekst kon niet gelezen worden: " + err.message);
+  }
 });
 
 toonVerborgenEl.addEventListener("change", async () => {

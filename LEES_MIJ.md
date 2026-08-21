@@ -27,9 +27,11 @@ testdata, zonder dat je de extensie eerst in Chrome moet herladen.
 2. Selecteer op een website de tekst van een reactie of melding.
 3. Klik rechts, kies "Voeg geselecteerde tekst toe aan opvolglijst".
 4. Klik op het extensie-icoontje om je verzamelde items te zien.
-5. Klik op "Samenvatten met AI" voor een overzicht en antwoordvoorstellen
+5. Klik op "Voeg pagina toe" om alle zichtbare tekst van de actieve pagina in
+   het actieve project te bewaren.
+6. Klik op "Samenvatten met AI" voor een overzicht en antwoordvoorstellen
    (vraagt je Anthropic API-key, blijft enkel lokaal in je browser opgeslagen).
-6. Klik op "Exporteer CSV" om het huidige project in een spreadsheet te bewaren.
+7. Klik op "Exporteer CSV" om het huidige project in een spreadsheet te bewaren.
 
 Je kan de extensie ook gebruiken buiten Facebook en LinkedIn. Dan bewaart ze de
 domeinnaam als bron, bijvoorbeeld `nieuwssite.be` of `schoolwebsite.be`.
@@ -69,6 +71,10 @@ Je kan de zijbalk ook openen met de knop "Zijbalk" in de popup.
 Een screenshot is handig wanneer tekst niet selecteerbaar is. Chrome laat een
 extensie niet op elke website exact hetzelfde element herkennen; daarom is er
 een fallback naar selectie of zichtbaar tabblad.
+
+"Voeg pagina toe" bewaart tekst die zichtbaar is in het huidige vensterdeel van
+de actieve pagina. Verborgen tekst, scripts, stijlen en tekst buiten beeld
+worden niet meegenomen.
 
 ## Belangrijk
 

@@ -1,0 +1,185 @@
+html, body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: #222;
+  background: #fafafa;
+}
+
+body {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0 0 16px;
+}
+
+.paneel {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.periodeRij {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.periodeRij label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: #555;
+  gap: 4px;
+}
+
+select, input[type=text], input[type=date] {
+  padding: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+button {
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid #bbb;
+  background: #f2f2f2;
+  border-radius: 5px;
+}
+
+button:hover {
+  background: #e6e6e6;
+}
+
+.statusRegel {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #777;
+  min-height: 14px;
+}
+
+.werkbalk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.werkbalk input[type=text] {
+  flex: 1 1 220px;
+}
+
+.aantalLabel {
+  font-size: 12px;
+  color: #777;
+  margin-left: auto;
+}
+
+#lijst {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
+.rij {
+  display: grid;
+  grid-template-columns: auto 20px 1fr 140px;
+  gap: 8px;
+  align-items: start;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+  font-size: 12px;
+}
+
+.rij:last-child {
+  border-bottom: none;
+}
+
+.rij .favicon {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+
+.rij .platform {
+  font-size: 10px;
+  color: #999;
+}
+
+.rij .titel {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.rij .url {
+  color: #666;
+  overflow-wrap: anywhere;
+}
+
+.rij .tijdstip {
+  color: #777;
+  font-size: 11px;
+}
+
+.rij .tagVeld {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px;
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.leeg {
+  padding: 16px;
+  color: #999;
+  font-size: 12px;
+  text-align: center;
+}
+
+#resultaat {
+  font-size: 13px;
+}
+
+#resultaat .groep {
+  margin-bottom: 14px;
+}
+
+#resultaat .groepTitel {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+#resultaat .groepItem {
+  padding: 3px 0 3px 10px;
+  border-left: 2px solid #ddd;
+  margin-bottom: 2px;
+}
+
+#resultaat .groepItem .tijd {
+  color: #888;
+  font-size: 11px;
+  margin-right: 6px;
+}
+
+#rapportBlok {
+  margin-top: 14px;
+}
+
+#rapportTekst {
+  white-space: pre-wrap;
+  background: #f7f7f7;
+  padding: 10px;
+  border-radius: 6px;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<title>Geschiedenisrapport</title>
+<link rel="stylesheet" href="geschiedenis.css" />
+</head>
+<body>
+  <h1>Geschiedenisrapport</h1>
+
+  <section class="paneel">
+    <div class="periodeRij">
+      <label>
+        Periode
+        <select id="periodeSelect">
+          <option value="vandaag">Vandaag</option>
+          <option value="gisteren">Gisteren</option>
+          <option value="aangepast">Aangepast bereik</option>
+        </select>
+      </label>
+      <label id="vanafRij" hidden>
+        Vanaf
+        <input type="date" id="vanafDatum" />
+      </label>
+      <label id="totRij" hidden>
+        Tot
+        <input type="date" id="totDatum" />
+      </label>
+      <button id="laadBtn">Laad geschiedenis</button>
+    </div>
+    <div class="statusRegel" id="laadStatus"></div>
+  </section>
+
+  <section class="paneel">
+    <div class="werkbalk">
+      <input type="text" id="zoekVeld" placeholder="Filter op titel of URL..." />
+      <button id="selecteerAlles">Alles selecteren</button>
+      <button id="wisSelectie">Selectie wissen</button>
+      <span class="aantalLabel" id="aantalLabel"></span>
+    </div>
+    <div id="lijst"></div>
+  </section>
+
+  <section class="paneel">
+    <div class="werkbalk">
+      <button id="groepeerAutoBtn">Groepeer automatisch per onderwerp</button>
+      <button id="groepeerTagBtn">Groepeer op tags</button>
+      <button id="rapportBtn">Genereer rapport van deze selectie</button>
+    </div>
+    <div id="resultaat"></div>
+    <div id="rapportBlok" hidden>
+      <div class="werkbalk">
+        <button id="kopieerBtn">Kopieer</button>
+        <button id="downloadBtn">Download als tekstbestand</button>
+      </div>
+      <pre id="rapportTekst"></pre>
+    </div>
+  </section>
+
+  <script src="geschiedenis.js"></script>
+</body>
+</html>
