@@ -40,12 +40,14 @@ Via rechtsklik zijn er drie acties:
 - "Voeg geselecteerde tekst toe aan opvolglijst": bewaart de tekst en de URL van
   de huidige pagina.
 - "Bewaar deze link in opvolglijst": bewaart de link waarop je rechtsklikt.
-- "Maak screenshot voor opvolglijst": bewaart een screenshot van het zichtbare
-  deel van het huidige tabblad.
+- "Maak screenshot voor opvolglijst": bewaart bij voorkeur het actieve
+  dialoogvenster of pop-upvenster op de pagina. Als dat niet gevonden wordt,
+  probeert de extensie de selectie te bewaren. Als ook dat niet lukt, bewaart
+  ze het zichtbare deel van het huidige tabblad.
 
 Een screenshot is handig wanneer tekst niet selecteerbaar is. Chrome laat een
-extensie niet zomaar de volledige webpagina of alleen een los geselecteerd
-gebied capteren; deze extensie bewaart daarom het zichtbare vensterdeel.
+extensie niet op elke website exact hetzelfde element herkennen; daarom is er
+een fallback naar selectie of zichtbaar tabblad.
 
 ## Belangrijk
 
