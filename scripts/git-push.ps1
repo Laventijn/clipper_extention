@@ -14,7 +14,18 @@ if (-not $remote) {
 
 $status = git status --porcelain
 if ($status) {
-  Write-Host "Let op: er staan nog niet-bewaarde wijzigingen open (gebruik eerst bewaar-versie.bat om te committen)."
+  Write-Host "Er staan nog niet-bewaarde wijzigingen open:"
+  git status --short
+  Write-Host ""
+
+  $Message = Read-Host "Commitnaam (leeg = automatische naam met datum/tijd)"
+  if (-not $Message) {
+    $stamp = Get-Date -Format "yyyy-MM-dd HH:mm"
+    $Message = "Bewaar versie $stamp"
+  }
+
+  git add .
+  git commit -m $Message
   Write-Host ""
 }
 

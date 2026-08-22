@@ -16,16 +16,37 @@ const rapportBlokEl = document.getElementById("rapportBlok");
 const rapportTekstEl = document.getElementById("rapportTekst");
 const kopieerBtn = document.getElementById("kopieerBtn");
 const downloadBtn = document.getElementById("downloadBtn");
+const taalSelectEl = document.getElementById("taalSelect");
 
 let historyItems = [];
 let geselecteerdeUrls = new Set();
 let tags = {};
+let huidigeTaal = "nl";
 
 async function init() {
-  const opgeslagen = await chrome.storage.local.get(["geschiedenisTags"]);
+  const opgeslagen = await chrome.storage.local.get(["geschiedenisTags", "taal"]);
   tags = opgeslagen.geschiedenisTags || {};
+  huidigeTaal = opgeslagen.taal || "nl";
+  taalSelectEl.value = huidigeTaal;
+  pasVertalingenToe(huidigeTaal);
   vulPeriodeVelden(periodeSelect.value);
+  renderLijst();
 }
+
+taalSelectEl.addEventListener("change", async () => {
+  huidigeTaal = taalSelectEl.value;
+  await chrome.storage.local.set({ taal: huidigeTaal });
+  pasVertalingenToe(huidigeTaal);
+  renderLijst();
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.taal) return;
+  huidigeTaal = changes.taal.newValue || "nl";
+  taalSelectEl.value = huidigeTaal;
+  pasVertalingenToe(huidigeTaal);
+  renderLijst();
+});
 
 function naarDatetimeLocalString(date) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -73,11 +94,11 @@ function bepaalPeriode() {
 laadBtn.addEventListener("click", async () => {
   const periode = bepaalPeriode();
   if (!periode) {
-    laadStatusEl.textContent = "Kies een geldig van- en tot-datum voor het aangepaste bereik.";
+    laadStatusEl.textContent = vertaal(huidigeTaal, "geschiedenis_ongeldigeDatum");
     return;
   }
 
-  laadStatusEl.textContent = "Geschiedenis laden...";
+  laadStatusEl.textContent = vertaal(huidigeTaal, "geschiedenis_ladenBezig");
   geselecteerdeUrls.clear();
   resultaatEl.innerHTML = "";
   rapportBlokEl.hidden = true;
@@ -94,10 +115,10 @@ laadBtn.addEventListener("click", async () => {
       .filter((item) => item.url)
       .sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
 
-    laadStatusEl.textContent = `${historyItems.length} resultaten geladen.`;
+    laadStatusEl.textContent = vertaal(huidigeTaal, "geschiedenis_resultatenGeladen", { aantal: historyItems.length });
     renderLijst();
   } catch (err) {
-    laadStatusEl.textContent = "Kon geschiedenis niet laden: " + err.message;
+    laadStatusEl.textContent = vertaal(huidigeTaal, "geschiedenis_ladenMislukt") + err.message;
   }
 });
 
@@ -105,7 +126,7 @@ function detecteerPlatform(url) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
-    return "Onbekend";
+    return vertaal(huidigeTaal, "algemeen_onbekend");
   }
 }
 
@@ -128,15 +149,17 @@ function renderLijst() {
   lijstEl.innerHTML = "";
 
   if (items.length === 0) {
-    lijstEl.innerHTML = '<div class="leeg">Geen resultaten. Laad eerst een periode of pas de filter aan.</div>';
+    lijstEl.innerHTML = `<div class="leeg">${escapeHtml(vertaal(huidigeTaal, "geschiedenis_geenResultaten"))}</div>`;
     bijwerkenAantalLabel();
     return;
   }
 
+  const tagPlaceholder = vertaal(huidigeTaal, "geschiedenis_tagPlaceholder");
+
   items.forEach((item) => {
     const rij = document.createElement("div");
     rij.className = "rij";
-    const tijdstip = item.lastVisitTime ? new Date(item.lastVisitTime).toLocaleString("nl-BE") : "";
+    const tijdstip = item.lastVisitTime ? new Date(item.lastVisitTime).toLocaleString(huidigeTaal) : "";
     const platform = detecteerPlatform(item.url);
     const bestaandeTag = tags[item.url] || "";
 
@@ -147,7 +170,7 @@ function renderLijst() {
         <div class="platform">${escapeHtml(platform)}</div>
         <div class="titel">${escapeHtml(item.title || item.url)}</div>
         <div class="url">${escapeHtml(item.url)}</div>
-        <input type="text" class="tagVeld" placeholder="Label / tag (bv. Furiant, school)" data-url="${escapeAttr(item.url)}" value="${escapeAttr(bestaandeTag)}" />
+        <input type="text" class="tagVeld" placeholder="${escapeAttr(tagPlaceholder)}" data-url="${escapeAttr(item.url)}" value="${escapeAttr(bestaandeTag)}" />
       </div>
       <div class="tijdstip">${escapeHtml(tijdstip)}</div>
     `;
@@ -178,7 +201,10 @@ lijstEl.addEventListener("change", async (event) => {
 });
 
 function bijwerkenAantalLabel() {
-  aantalLabelEl.textContent = `${geselecteerdeUrls.size} geselecteerd van ${historyItems.length}`;
+  aantalLabelEl.textContent = vertaal(huidigeTaal, "geschiedenis_aantalGeselecteerd", {
+    geselecteerd: geselecteerdeUrls.size,
+    totaal: historyItems.length
+  });
 }
 
 zoekVeldEl.addEventListener("input", renderLijst);
@@ -200,7 +226,7 @@ function geselecteerdeItems() {
     .map((item) => ({
       titel: item.title || item.url,
       url: item.url,
-      tijdstip: item.lastVisitTime ? new Date(item.lastVisitTime).toLocaleString("nl-BE") : "",
+      tijdstip: item.lastVisitTime ? new Date(item.lastVisitTime).toLocaleString(huidigeTaal) : "",
       tag: tags[item.url] || ""
     }));
 }
@@ -237,45 +263,38 @@ async function roepAnthropicApiAan(apiKey, prompt, maxTokens = 4096) {
 function toonAfkapWaarschuwing(container, aantalItems) {
   const waarschuwing = document.createElement("div");
   waarschuwing.className = "waarschuwing";
-  waarschuwing.textContent =
-    `Let op: het antwoord van de AI werd afgekapt (te veel geselecteerde items: ${aantalItems}). ` +
-    "Maak een kleinere selectie of verwerk de geschiedenis in meerdere delen voor een volledig resultaat.";
+  waarschuwing.textContent = vertaal(huidigeTaal, "geschiedenis_afgekaptWaarschuwing", { aantal: aantalItems });
   container.prepend(waarschuwing);
 }
 
 groepeerAutoBtn.addEventListener("click", async () => {
   const items = geselecteerdeItems();
   if (items.length === 0) {
-    alert("Selecteer eerst één of meer items.");
+    alert(vertaal(huidigeTaal, "geschiedenis_selecteerEerst"));
     return;
   }
 
   const apiKey = await haalApiKeyOp();
   if (!apiKey) {
-    alert("Vul eerst je Anthropic API-key in via de popup.");
+    alert(vertaal(huidigeTaal, "geschiedenis_vulApiKeyViaPopup"));
     return;
   }
 
-  resultaatEl.innerHTML = '<div class="leeg">Bezig met groeperen...</div>';
+  resultaatEl.innerHTML = `<div class="leeg">${escapeHtml(vertaal(huidigeTaal, "geschiedenis_bezigGroeperen"))}</div>`;
   rapportBlokEl.hidden = true;
 
   const lijstTekst = items
     .map((i) => `- [${i.tijdstip}] ${i.titel} (${i.url})`)
     .join("\n");
 
-  const prompt =
-    "Onderstaande lijst zijn bezochte webpagina's (titel, URL, tijdstip). " +
-    "Clusteer ze per herkenbaar onderwerp en geef een gestructureerd overzicht terug in het Nederlands. " +
-    "Gebruik per onderwerp een duidelijke kopregel gevolgd door de bijhorende paginatitels en tijdstippen, elk op een eigen regel. " +
-    "Gebruik het formaat 'ONDERWERP: <naam>' als kopregel en daaronder regels met '- <tijdstip> · <titel>'.\n\n" +
-    lijstTekst;
+  const prompt = vertaal(huidigeTaal, "geschiedenis_groepeerAutoPrompt") + "\n\n" + lijstTekst;
 
   try {
     const { tekst, afgekapt } = await roepAnthropicApiAan(apiKey, prompt, 8192);
     toonRuweGroepering(tekst);
     if (afgekapt) toonAfkapWaarschuwing(resultaatEl, items.length);
   } catch (err) {
-    resultaatEl.innerHTML = `<div class="leeg">Fout bij groeperen: ${escapeHtml(err.message)}</div>`;
+    resultaatEl.innerHTML = `<div class="leeg">${escapeHtml(vertaal(huidigeTaal, "geschiedenis_foutGroeperen"))}${escapeHtml(err.message)}</div>`;
   }
 });
 
@@ -285,7 +304,7 @@ function maakGroepElement(titel, aantal, itemsHtml) {
   groep.innerHTML = `
     <div class="groepTitel">
       <span>${escapeHtml(titel)}${aantal != null ? ` (${aantal})` : ""}</span>
-      <span class="toggleIcon">verberg</span>
+      <span class="toggleIcon">${escapeHtml(vertaal(huidigeTaal, "algemeen_verbergen"))}</span>
     </div>
     <div class="groepBody">${itemsHtml}</div>
   `;
@@ -294,14 +313,14 @@ function maakGroepElement(titel, aantal, itemsHtml) {
 
 function toonRuweGroepering(tekst) {
   resultaatEl.innerHTML = "";
-  const blokken = tekst.split(/\n(?=ONDERWERP:)/i);
+  const blokken = tekst.split(/\n(?=@@ONDERWERP@@)/);
   let ietsGetoond = false;
 
   blokken.forEach((blok) => {
     const regels = blok.trim().split("\n").filter(Boolean);
     if (regels.length === 0) return;
 
-    const kop = regels[0].replace(/^ONDERWERP:\s*/i, "").trim() || "Onderwerp";
+    const kop = regels[0].replace(/^@@ONDERWERP@@\s*/, "").trim() || vertaal(huidigeTaal, "geschiedenis_onderwerpFallback");
     const items = regels.slice(1).map((regel) => `<div class="groepItem">${escapeHtml(regel.replace(/^-+\s*/, ""))}</div>`).join("");
     resultaatEl.appendChild(maakGroepElement(kop, null, items));
     ietsGetoond = true;
@@ -319,28 +338,29 @@ resultaatEl.addEventListener("click", (event) => {
   const groep = titelRij.closest(".groep");
   groep.classList.toggle("dicht");
   const icoon = titelRij.querySelector(".toggleIcon");
-  if (icoon) icoon.textContent = groep.classList.contains("dicht") ? "toon" : "verberg";
+  if (icoon) icoon.textContent = vertaal(huidigeTaal, groep.classList.contains("dicht") ? "algemeen_tonen" : "algemeen_verbergen");
 });
 
 groepeerTagBtn.addEventListener("click", () => {
   const items = geselecteerdeItems();
   if (items.length === 0) {
-    alert("Selecteer eerst één of meer items.");
+    alert(vertaal(huidigeTaal, "geschiedenis_selecteerEerst"));
     return;
   }
 
   rapportBlokEl.hidden = true;
   resultaatEl.innerHTML = "";
 
+  const zonderLabel = vertaal(huidigeTaal, "geschiedenis_zonderLabel");
   const groepen = new Map();
   items.forEach((item) => {
-    const naam = item.tag || "Zonder label";
+    const naam = item.tag || zonderLabel;
     if (!groepen.has(naam)) groepen.set(naam, []);
     groepen.get(naam).push(item);
   });
 
   Array.from(groepen.entries())
-    .sort((a, b) => (a[0] === "Zonder label" ? 1 : b[0] === "Zonder label" ? -1 : a[0].localeCompare(b[0])))
+    .sort((a, b) => (a[0] === zonderLabel ? 1 : b[0] === zonderLabel ? -1 : a[0].localeCompare(b[0])))
     .forEach(([naam, groepItems]) => {
       const itemsHtml = groepItems
         .map((i) => `<div class="groepItem"><span class="tijd">${escapeHtml(i.tijdstip)}</span>${escapeHtml(i.titel)}</div>`)
@@ -352,37 +372,33 @@ groepeerTagBtn.addEventListener("click", () => {
 rapportBtn.addEventListener("click", async () => {
   const items = geselecteerdeItems();
   if (items.length === 0) {
-    alert("Selecteer eerst één of meer items.");
+    alert(vertaal(huidigeTaal, "geschiedenis_selecteerEerst"));
     return;
   }
 
   const apiKey = await haalApiKeyOp();
   if (!apiKey) {
-    alert("Vul eerst je Anthropic API-key in via de popup.");
+    alert(vertaal(huidigeTaal, "geschiedenis_vulApiKeyViaPopup"));
     return;
   }
 
   resultaatEl.innerHTML = "";
   rapportBlokEl.hidden = false;
-  rapportTekstEl.textContent = "Rapport wordt gegenereerd...";
+  rapportTekstEl.textContent = vertaal(huidigeTaal, "geschiedenis_rapportBezig");
 
   const lijstTekst = items
     .map((i) => `- [${i.tijdstip}]${i.tag ? ` (label: ${i.tag})` : ""} ${i.titel} — ${i.url}`)
     .join("\n");
 
-  const prompt =
-    "Hieronder staat een selectie van bezochte webpagina's (titel, URL, tijdstip, eventueel een label). " +
-    "Schrijf in het Nederlands een lopend rapport over wat er in deze periode werd opgezocht, gegroepeerd per thema. " +
-    "Schrijf per thema een paar zinnen in lopende tekst, geen opsomming van elke URL apart.\n\n" +
-    lijstTekst;
+  const prompt = vertaal(huidigeTaal, "geschiedenis_rapportPrompt") + "\n\n" + lijstTekst;
 
   try {
     const { tekst, afgekapt } = await roepAnthropicApiAan(apiKey, prompt, 4096);
     rapportTekstEl.textContent = afgekapt
-      ? tekst + "\n\n[Let op: dit rapport werd afgekapt door te veel geselecteerde items. Maak een kleinere selectie voor een volledig rapport.]"
+      ? tekst + vertaal(huidigeTaal, "geschiedenis_rapportAfgekaptSuffix")
       : tekst;
   } catch (err) {
-    rapportTekstEl.textContent = "Fout bij genereren van rapport: " + err.message;
+    rapportTekstEl.textContent = vertaal(huidigeTaal, "geschiedenis_foutRapport") + err.message;
   }
 });
 
@@ -390,7 +406,7 @@ kopieerBtn.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(rapportTekstEl.textContent);
   } catch {
-    alert("Kopiëren is mislukt. Selecteer en kopieer de tekst handmatig.");
+    alert(vertaal(huidigeTaal, "algemeen_kopierenMislukt"));
   }
 });
 

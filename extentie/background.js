@@ -1,27 +1,39 @@
+importScripts("i18n.js");
+
 // Klik op het extensie-icoontje opent meteen de zijbalk, geen popup
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((error) => console.error(error));
 
-// Rechtsklik-menu-items aanmaken zodra de extensie start
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: "voegSelectieToeAanOpvolglijst",
-    title: "Voeg geselecteerde tekst toe aan opvolglijst",
-    contexts: ["selection"]
-  });
+// Rechtsklik-menu-items aanmaken zodra de extensie start, in de opgeslagen taal
+async function herbouwContextMenus() {
+  const taal = await haalOpgeslagenTaal();
 
-  chrome.contextMenus.create({
-    id: "voegLinkToeAanOpvolglijst",
-    title: "Bewaar deze link in opvolglijst",
-    contexts: ["link"]
-  });
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "voegSelectieToeAanOpvolglijst",
+      title: vertaal(taal, "menu_voegSelectie"),
+      contexts: ["selection"]
+    });
 
-  chrome.contextMenus.create({
-    id: "voegScreenshotToeAanOpvolglijst",
-    title: "Maak screenshot voor opvolglijst",
-    contexts: ["page", "selection", "link"]
+    chrome.contextMenus.create({
+      id: "voegLinkToeAanOpvolglijst",
+      title: vertaal(taal, "menu_bewaarLink"),
+      contexts: ["link"]
+    });
+
+    chrome.contextMenus.create({
+      id: "voegScreenshotToeAanOpvolglijst",
+      title: vertaal(taal, "menu_maakScreenshot"),
+      contexts: ["page", "selection", "link"]
+    });
   });
+}
+
+chrome.runtime.onInstalled.addListener(herbouwContextMenus);
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.taal) herbouwContextMenus();
 });
 
 // Klik op het menu-item verwerken
@@ -273,6 +285,6 @@ function detecteerPlatform(url) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
-    return "Onbekend";
+    return "";
   }
 }

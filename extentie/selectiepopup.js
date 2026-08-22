@@ -3,6 +3,15 @@
   let shadow = null;
   let balkEl = null;
   let verbergTimer = null;
+  let huidigeTaal = "nl";
+
+  haalOpgeslagenTaal().then((taal) => {
+    huidigeTaal = taal;
+  });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.taal) huidigeTaal = changes.taal.newValue || "nl";
+  });
 
   function maakBalk() {
     if (host) return;
@@ -60,7 +69,7 @@
           <rect x="9" y="9" width="13" height="13" rx="2"></rect>
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
         </svg>
-        <span id="kopieerLabel">Kopieer</span>
+        <span id="kopieerLabel">${vertaal(huidigeTaal, "algemeen_kopieer")}</span>
       </button>
     `;
     shadow.appendChild(balkEl);
@@ -79,9 +88,9 @@
     const labelEl = shadow.getElementById("kopieerLabel");
     try {
       await navigator.clipboard.writeText(tekst);
-      labelEl.textContent = "Gekopieerd!";
+      labelEl.textContent = vertaal(huidigeTaal, "algemeen_gekopieerd");
     } catch {
-      labelEl.textContent = "Mislukt";
+      labelEl.textContent = vertaal(huidigeTaal, "algemeen_mislukt");
     }
     setTimeout(() => verbergBalk(), 700);
   }
@@ -91,7 +100,7 @@
   function toonBalk(rect) {
     maakBalk();
     laatsteSelectieTekst = window.getSelection().toString();
-    shadow.getElementById("kopieerLabel").textContent = "Kopieer";
+    shadow.getElementById("kopieerLabel").textContent = vertaal(huidigeTaal, "algemeen_kopieer");
 
     host.style.display = "block";
     // eerst zichtbaar maken om afmetingen te kunnen meten

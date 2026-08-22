@@ -15,6 +15,14 @@ if (-not $status) {
   exit 0
 }
 
+Write-Host "Wijzigingen gevonden:"
+git status --short
+Write-Host ""
+
+if (-not $PSBoundParameters.ContainsKey('Message')) {
+  $Message = Read-Host "Commitnaam (leeg = automatische naam met datum/tijd)"
+}
+
 git add .
 
 if (-not $Message) {

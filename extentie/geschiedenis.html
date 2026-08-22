@@ -6,36 +6,46 @@
 <link rel="stylesheet" href="geschiedenis.css" />
 </head>
 <body>
-  <h1>Geschiedenisrapport</h1>
+  <div class="kopRij">
+    <h1 data-i18n="geschiedenis_titel">Geschiedenisrapport</h1>
+    <div class="taalRij">
+      <label for="taalSelect" data-i18n="taal_label">Taal</label>
+      <select id="taalSelect">
+        <option value="nl">Nederlands</option>
+        <option value="en">English</option>
+        <option value="fr">Français</option>
+      </select>
+    </div>
+  </div>
 
   <section class="paneel">
     <div class="periodeRij">
       <label>
-        Periode
+        <span data-i18n="geschiedenis_periode">Periode</span>
         <select id="periodeSelect">
-          <option value="vandaag">Vandaag</option>
-          <option value="gisteren">Gisteren</option>
-          <option value="aangepast">Aangepast bereik</option>
+          <option value="vandaag" data-i18n="geschiedenis_vandaag">Vandaag</option>
+          <option value="gisteren" data-i18n="geschiedenis_gisteren">Gisteren</option>
+          <option value="aangepast" data-i18n="geschiedenis_aangepast">Aangepast bereik</option>
         </select>
       </label>
       <label id="vanafRij">
-        Vanaf
+        <span data-i18n="geschiedenis_vanaf">Vanaf</span>
         <input type="datetime-local" id="vanafDatum" />
       </label>
       <label id="totRij">
-        Tot
+        <span data-i18n="geschiedenis_tot">Tot</span>
         <input type="datetime-local" id="totDatum" />
       </label>
-      <button id="laadBtn">Laad geschiedenis</button>
+      <button id="laadBtn" data-i18n="geschiedenis_laadKnop">Laad geschiedenis</button>
     </div>
     <div class="statusRegel" id="laadStatus"></div>
   </section>
 
   <section class="paneel">
     <div class="werkbalk">
-      <input type="text" id="zoekVeld" placeholder="Filter op titel of URL..." />
-      <button id="selecteerAlles">Alles selecteren</button>
-      <button id="wisSelectie">Selectie wissen</button>
+      <input type="text" id="zoekVeld" data-i18n-placeholder="geschiedenis_filterPlaceholder" placeholder="Filter op titel of URL..." />
+      <button id="selecteerAlles" data-i18n="algemeen_allesSelecteren">Alles selecteren</button>
+      <button id="wisSelectie" data-i18n="algemeen_selectieWissen">Selectie wissen</button>
       <span class="aantalLabel" id="aantalLabel"></span>
     </div>
     <div id="lijst"></div>
@@ -43,20 +53,21 @@
 
   <section class="paneel">
     <div class="werkbalk">
-      <button id="groepeerAutoBtn">Groepeer automatisch per onderwerp</button>
-      <button id="groepeerTagBtn">Groepeer op tags</button>
-      <button id="rapportBtn">Genereer rapport van deze selectie</button>
+      <button id="groepeerAutoBtn" data-i18n="geschiedenis_groepeerAuto">Groepeer automatisch per onderwerp</button>
+      <button id="groepeerTagBtn" data-i18n="geschiedenis_groepeerTags">Groepeer op tags</button>
+      <button id="rapportBtn" data-i18n="geschiedenis_genereerRapport">Genereer rapport van deze selectie</button>
     </div>
     <div id="resultaat"></div>
     <div id="rapportBlok" hidden>
       <div class="werkbalk">
-        <button id="kopieerBtn">Kopieer</button>
-        <button id="downloadBtn">Download als tekstbestand</button>
+        <button id="kopieerBtn" data-i18n="algemeen_kopieer">Kopieer</button>
+        <button id="downloadBtn" data-i18n="algemeen_download">Download als tekstbestand</button>
       </div>
       <pre id="rapportTekst"></pre>
     </div>
   </section>
 
+  <script src="i18n.js"></script>
   <script src="geschiedenis.js"></script>
 </body>
 </html>

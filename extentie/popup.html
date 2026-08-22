@@ -12,7 +12,11 @@
     padding: 12px;
     font-family: system-ui, sans-serif;
   }
-  h1 { font-size: 15px; margin: 0 0 10px; }
+  h1 { font-size: 15px; margin: 0; }
+  .kopRij { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .taalRij { display: flex; align-items: center; gap: 5px; }
+  .taalRij label { font-size: 11px; color: #777; }
+  #taalSelect { width: auto; padding: 3px 4px; font-size: 11px; }
   .projectRij { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; margin-bottom: 8px; }
   .projectNaamRij { display: flex; gap: 6px; margin-bottom: 8px; }
   .projectNaamRij[hidden] { display: none; }
@@ -50,38 +54,49 @@
 </style>
 </head>
 <body>
-  <h1>Verzamelde reacties</h1>
+  <div class="kopRij">
+    <h1 data-i18n="popup_titel">Verzamelde reacties</h1>
+    <div class="taalRij">
+      <label for="taalSelect" data-i18n="taal_label">Taal</label>
+      <select id="taalSelect">
+        <option value="nl">Nederlands</option>
+        <option value="en">English</option>
+        <option value="fr">Français</option>
+      </select>
+    </div>
+  </div>
   <div class="projectRij">
-    <select id="projectSelect" aria-label="Project selecteren"></select>
-    <button id="nieuwProjectBtn">Nieuw</button>
-    <button id="hernoemProjectBtn">Hernoem</button>
+    <select id="projectSelect" data-i18n-aria-label="popup_projectSelectLabel" aria-label="Project selecteren"></select>
+    <button id="nieuwProjectBtn" data-i18n="popup_nieuw">Nieuw</button>
+    <button id="hernoemProjectBtn" data-i18n="popup_hernoem">Hernoem</button>
   </div>
   <div class="projectNaamRij" id="projectNaamRij" hidden>
-    <input type="text" id="projectNaam" placeholder="Projectnaam" />
-    <button id="bewaarProjectNaamBtn">Bewaar</button>
+    <input type="text" id="projectNaam" data-i18n-placeholder="popup_projectnaamPlaceholder" placeholder="Projectnaam" />
+    <button id="bewaarProjectNaamBtn" data-i18n="popup_bewaar">Bewaar</button>
   </div>
   <div id="lijst"></div>
 
   <div class="knoppen">
-    <button id="voegPaginaBtn">Voeg pagina toe</button>
-    <button id="samenvattenBtn">Samenvatten met AI</button>
-    <button id="kopieerProjectBtn">Kopieer projecttekst</button>
-    <button id="exportBtn">Exporteer CSV</button>
-    <button id="wisBtn">Minimaliseer alles</button>
-    <button id="openGeschiedenisBtn">Open geschiedenisrapport</button>
+    <button id="voegPaginaBtn" data-i18n="popup_voegPagina">Voeg pagina toe</button>
+    <button id="samenvattenBtn" data-i18n="popup_samenvatten">Samenvatten met AI</button>
+    <button id="kopieerProjectBtn" data-i18n="popup_kopieerProject">Kopieer projecttekst</button>
+    <button id="exportBtn" data-i18n="popup_exportCsv">Exporteer CSV</button>
+    <button id="wisBtn" data-i18n="popup_minimaliseerAlles">Minimaliseer alles</button>
+    <button id="openGeschiedenisBtn" data-i18n="popup_openGeschiedenis">Open geschiedenisrapport</button>
   </div>
 
   <div id="samenvatting"></div>
   <div class="samenvattingActies" id="samenvattingActies" hidden>
-    <button id="kopieerSamenvattingBtn">Kopieer</button>
-    <button id="downloadSamenvattingBtn">Download als tekstbestand</button>
+    <button id="kopieerSamenvattingBtn" data-i18n="algemeen_kopieer">Kopieer</button>
+    <button id="downloadSamenvattingBtn" data-i18n="algemeen_download">Download als tekstbestand</button>
   </div>
 
   <div id="apiKeyRij">
-    <label>Anthropic API-key (blijft lokaal opgeslagen):</label>
+    <label data-i18n="popup_apiKeyLabel">Anthropic API-key (blijft lokaal opgeslagen):</label>
     <input type="password" id="apiKey" placeholder="sk-ant-..." />
   </div>
 
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -9,10 +9,12 @@ const projectNaamEl = document.getElementById("projectNaam");
 const bewaarProjectNaamBtn = document.getElementById("bewaarProjectNaamBtn");
 const openGeschiedenisBtn = document.getElementById("openGeschiedenisBtn");
 const voegPaginaBtn = document.getElementById("voegPaginaBtn");
+const taalSelectEl = document.getElementById("taalSelect");
 const isChromeExtension = Boolean(globalThis.chrome?.storage?.local);
 const storage = maakStorage();
 
 let state = null;
+let huidigeTaal = "nl";
 
 function maakStorage() {
   if (isChromeExtension) return chrome.storage.local;
@@ -81,6 +83,7 @@ function maakStorage() {
       if ("projecten" in data) localStorage.setItem("preview-projecten", JSON.stringify(data.projecten));
       if ("actiefProjectId" in data) localStorage.setItem("preview-actief-project-id", data.actiefProjectId);
       if ("apiKey" in data) localStorage.setItem("preview-api-key", data.apiKey);
+      if ("taal" in data) localStorage.setItem("preview-taal", data.taal);
     }
   };
 }
@@ -124,6 +127,9 @@ async function laadState() {
 async function ververs() {
   const data = await storage.get(["projecten", "actiefProjectId", "items", "apiKey"]);
   state = normaliseerState(data);
+  huidigeTaal = await haalOpgeslagenTaal();
+  taalSelectEl.value = huidigeTaal;
+  pasVertalingenToe(huidigeTaal);
   renderAlles();
 }
 
@@ -176,34 +182,36 @@ function laadItems() {
   lijstEl.innerHTML = "";
 
   if (items.length === 0) {
-    lijstEl.innerHTML = '<div class="leeg">Geen records in dit project.</div>';
+    lijstEl.innerHTML = `<div class="leeg">${escapeHtml(vertaal(huidigeTaal, "popup_leeg"))}</div>`;
     return;
   }
 
   items.slice().reverse().forEach((item) => {
     const div = document.createElement("div");
     div.className = `item${item.verborgen ? " verborgen" : ""}`;
-    const datum = new Date(item.datum).toLocaleString("nl-BE");
+    const datum = new Date(item.datum).toLocaleString(huidigeTaal);
     const bron = item.bron || item.paginaUrl || "";
     const type = item.type || "tekst";
     const extraMeta = [item.siteNaam, item.auteur, item.taal].filter(Boolean).map(escapeHtml).join(" · ");
     const titelRegel = item.paginaTitel ? `<div class="paginaTitel">${escapeHtml(item.paginaTitel)}</div>` : "";
     const gepubliceerd = item.gepubliceerdOp ? formatteerGepubliceerdOp(item.gepubliceerdOp) : "";
+    const wisselLabel = vertaal(huidigeTaal, item.verborgen ? "popup_uitklappen" : "popup_inklappen");
+    const verwijderLabel = vertaal(huidigeTaal, "algemeen_verwijderen");
 
     const inhoud = item.verborgen
       ? ""
       : `
         <div class="tekst">${escapeHtml(item.tekst || "")}</div>
         ${item.beschrijving ? `<div class="beschrijving">${escapeHtml(item.beschrijving)}</div>` : ""}
-        ${bron ? `<div class="bron"><a href="${escapeAttr(bron)}" target="_blank" rel="noreferrer">Open bron</a><br>${escapeHtml(korteUrl(bron))}</div>` : ""}
-        ${item.screenshot ? `<img class="screenshot" src="${escapeAttr(item.screenshot)}" alt="Screenshot van bronpagina">` : ""}
+        ${bron ? `<div class="bron"><a href="${escapeAttr(bron)}" target="_blank" rel="noreferrer">${escapeHtml(vertaal(huidigeTaal, "popup_openBron"))}</a><br>${escapeHtml(korteUrl(bron))}</div>` : ""}
+        ${item.screenshot ? `<img class="screenshot" src="${escapeAttr(item.screenshot)}" alt="${escapeAttr(vertaal(huidigeTaal, "popup_screenshotAlt"))}">` : ""}
       `;
 
     div.innerHTML = `
       <div class="itemKop">
-        <button type="button" class="icoonKnop" data-actie="wissel" data-id="${escapeAttr(item.id)}" title="${item.verborgen ? "Uitklappen" : "Inklappen"}" aria-label="${item.verborgen ? "Uitklappen" : "Inklappen"}">${item.verborgen ? "+" : "−"}</button>
-        <div class="meta">${escapeHtml(item.platform || "Onbekend")} · ${datum} · ${escapeHtml(type)}${extraMeta ? ` · ${extraMeta}` : ""}${gepubliceerd ? ` · gepubliceerd ${escapeHtml(gepubliceerd)}` : ""}</div>
-        <button type="button" class="icoonKnop vuilbak" data-actie="verwijder" data-id="${escapeAttr(item.id)}" title="Verwijderen" aria-label="Verwijderen">
+        <button type="button" class="icoonKnop" data-actie="wissel" data-id="${escapeAttr(item.id)}" title="${escapeAttr(wisselLabel)}" aria-label="${escapeAttr(wisselLabel)}">${item.verborgen ? "+" : "−"}</button>
+        <div class="meta">${escapeHtml(item.platform || vertaal(huidigeTaal, "algemeen_onbekend"))} · ${datum} · ${escapeHtml(type)}${extraMeta ? ` · ${extraMeta}` : ""}${gepubliceerd ? ` · ${escapeHtml(vertaal(huidigeTaal, "popup_gepubliceerd"))} ${escapeHtml(gepubliceerd)}` : ""}</div>
+        <button type="button" class="icoonKnop vuilbak" data-actie="verwijder" data-id="${escapeAttr(item.id)}" title="${escapeAttr(verwijderLabel)}" aria-label="${escapeAttr(verwijderLabel)}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 6h18"></path>
             <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -232,7 +240,7 @@ function escapeAttr(tekst) {
 
 function formatteerGepubliceerdOp(waarde) {
   const datum = new Date(waarde);
-  return Number.isNaN(datum.getTime()) ? waarde : datum.toLocaleDateString("nl-BE");
+  return Number.isNaN(datum.getTime()) ? waarde : datum.toLocaleDateString(huidigeTaal);
 }
 
 function korteUrl(url) {
@@ -255,7 +263,7 @@ function detecteerPlatform(url) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
-    return "Onbekend";
+    return "";
   }
 }
 
@@ -325,7 +333,7 @@ projectSelectEl.addEventListener("change", async () => {
 });
 
 nieuwProjectBtn.addEventListener("click", async () => {
-  const naam = prompt("Naam van het nieuwe project?", "Nieuw project");
+  const naam = prompt(vertaal(huidigeTaal, "popup_nieuwProjectPrompt"), vertaal(huidigeTaal, "popup_nieuwProjectDefault"));
   if (!naam) return;
 
   const project = { id: maakId(), naam: naam.trim(), items: [] };
@@ -354,7 +362,7 @@ bewaarProjectNaamBtn.addEventListener("click", async () => {
 
 openGeschiedenisBtn.addEventListener("click", () => {
   if (!globalThis.chrome?.tabs) {
-    alert("Deze functie werkt alleen in de geladen Chrome-extensie.");
+    alert(vertaal(huidigeTaal, "algemeen_alleenInExtensie"));
     return;
   }
   chrome.tabs.create({ url: chrome.runtime.getURL("geschiedenis.html") });
@@ -362,7 +370,7 @@ openGeschiedenisBtn.addEventListener("click", () => {
 
 voegPaginaBtn.addEventListener("click", async () => {
   if (!globalThis.chrome?.scripting) {
-    alert("Deze functie werkt alleen in de geladen Chrome-extensie.");
+    alert(vertaal(huidigeTaal, "algemeen_alleenInExtensie"));
     return;
   }
 
@@ -377,7 +385,7 @@ voegPaginaBtn.addEventListener("click", async () => {
     const pagina = result?.result;
 
     if (!pagina?.tekst) {
-      alert("Geen zichtbare tekst gevonden op deze pagina.");
+      alert(vertaal(huidigeTaal, "popup_geenTekstGevonden"));
       return;
     }
 
@@ -403,7 +411,7 @@ voegPaginaBtn.addEventListener("click", async () => {
     await bewaarState();
     renderAlles();
   } catch (err) {
-    alert("De zichtbare tekst kon niet gelezen worden: " + err.message);
+    alert(vertaal(huidigeTaal, "popup_tekstNietGelezen") + err.message);
   }
 });
 
@@ -416,7 +424,7 @@ lijstEl.addEventListener("click", async (event) => {
   if (!item) return;
 
   if (button.dataset.actie === "verwijder") {
-    if (!confirm("Dit record definitief verwijderen?")) return;
+    if (!confirm(vertaal(huidigeTaal, "popup_bevestigVerwijderen"))) return;
     project.items = project.items.filter((record) => record.id !== item.id);
   } else if (button.dataset.actie === "wissel") {
     item.verborgen = !item.verborgen;
@@ -428,7 +436,7 @@ lijstEl.addEventListener("click", async (event) => {
 
 document.getElementById("wisBtn").addEventListener("click", async () => {
   const project = actiefProject();
-  if (!confirm(`Alle records in "${project.naam}" minimaliseren?`)) return;
+  if (!confirm(vertaal(huidigeTaal, "popup_bevestigMinimaliseren", { naam: project.naam }))) return;
 
   project.items.forEach((item) => {
     item.verborgen = true;
@@ -444,26 +452,26 @@ document.getElementById("exportBtn").addEventListener("click", async () => {
 
   const rijen = [
     [
-      "project",
-      "geminimaliseerd",
-      "type",
-      "platform",
-      "datum",
-      "bron",
-      "paginatitel",
-      "sitenaam",
-      "auteur",
-      "gepubliceerd_op",
-      "taal",
-      "beschrijving",
-      "tekst",
-      "heeft_screenshot"
+      vertaal(huidigeTaal, "csv_project"),
+      vertaal(huidigeTaal, "csv_geminimaliseerd"),
+      vertaal(huidigeTaal, "csv_type"),
+      vertaal(huidigeTaal, "csv_platform"),
+      vertaal(huidigeTaal, "csv_datum"),
+      vertaal(huidigeTaal, "csv_bron"),
+      vertaal(huidigeTaal, "csv_paginatitel"),
+      vertaal(huidigeTaal, "csv_sitenaam"),
+      vertaal(huidigeTaal, "csv_auteur"),
+      vertaal(huidigeTaal, "csv_gepubliceerdOp"),
+      vertaal(huidigeTaal, "csv_taal"),
+      vertaal(huidigeTaal, "csv_beschrijving"),
+      vertaal(huidigeTaal, "csv_tekst"),
+      vertaal(huidigeTaal, "csv_screenshot")
     ]
   ];
   items.forEach((i) =>
     rijen.push([
       project.naam,
-      i.verborgen ? "ja" : "nee",
+      i.verborgen ? vertaal(huidigeTaal, "algemeen_ja") : vertaal(huidigeTaal, "algemeen_nee"),
       i.type || "tekst",
       i.platform,
       i.datum,
@@ -475,7 +483,7 @@ document.getElementById("exportBtn").addEventListener("click", async () => {
       i.taal || "",
       (i.beschrijving || "").replace(/\n/g, " "),
       (i.tekst || "").replace(/\n/g, " "),
-      i.screenshot ? "ja" : "nee"
+      i.screenshot ? vertaal(huidigeTaal, "algemeen_ja") : vertaal(huidigeTaal, "algemeen_nee")
     ])
   );
   const csv = rijen.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -499,7 +507,8 @@ function bouwProjectTekstBlok(project, items) {
   return items
     .map((i) => {
       const screenshotInfo = i.screenshot ? " [screenshot bewaard]" : "";
-      return `[${project.naam} · ${i.platform} · ${i.type || "tekst"} · ${new Date(i.datum).toLocaleDateString("nl-BE")}] ${i.tekst}${screenshotInfo}\nBron: ${i.bron || i.paginaUrl || ""}`;
+      const platform = i.platform || vertaal(huidigeTaal, "algemeen_onbekend");
+      return `[${project.naam} · ${platform} · ${i.type || "tekst"} · ${new Date(i.datum).toLocaleDateString(huidigeTaal)}] ${i.tekst}${screenshotInfo}\nBron: ${i.bron || i.paginaUrl || ""}`;
     })
     .join("\n\n");
 }
@@ -508,9 +517,9 @@ async function kopieerTekstMetFeedback(tekst, knop) {
   const oorspronkelijkeLabel = knop.textContent;
   try {
     await navigator.clipboard.writeText(tekst);
-    knop.textContent = "Gekopieerd!";
+    knop.textContent = vertaal(huidigeTaal, "algemeen_gekopieerd");
   } catch {
-    knop.textContent = "Mislukt";
+    knop.textContent = vertaal(huidigeTaal, "algemeen_mislukt");
   }
   setTimeout(() => {
     knop.textContent = oorspronkelijkeLabel;
@@ -522,7 +531,7 @@ document.getElementById("kopieerProjectBtn").addEventListener("click", async (ev
   const items = projectItems(project);
 
   if (items.length === 0) {
-    alert("Er zijn geen records om te kopiëren.");
+    alert(vertaal(huidigeTaal, "popup_geenRecordsKopieren"));
     return;
   }
 
@@ -562,16 +571,16 @@ document.getElementById("samenvattenBtn").addEventListener("click", async () => 
   const apiKey = state.apiKey;
 
   if (items.length === 0) {
-    alert("Er zijn geen records om samen te vatten.");
+    alert(vertaal(huidigeTaal, "popup_geenRecordsSamenvatten"));
     return;
   }
   if (!apiKey) {
-    alert("Vul eerst je Anthropic API-key in.");
+    alert(vertaal(huidigeTaal, "algemeen_vulApiKeyIn"));
     return;
   }
 
   samenvattingEl.style.display = "block";
-  samenvattingEl.textContent = "Bezig met samenvatten...";
+  samenvattingEl.textContent = vertaal(huidigeTaal, "popup_bezigSamenvatten");
   samenvattingActiesEl.hidden = false;
 
   const tekstBlok = bouwProjectTekstBlok(project, items);
@@ -591,10 +600,7 @@ document.getElementById("samenvattenBtn").addEventListener("click", async () => 
         messages: [
           {
             role: "user",
-            content:
-              "Vat onderstaande verzameling tekst, links en screenshots samen in het Nederlands. " +
-              "Groepeer per thema, benoem de toon (positief/kritisch/vraag), en stel waar relevant een kort antwoord voor.\n\n" +
-              tekstBlok
+            content: vertaal(huidigeTaal, "popup_samenvattenPrompt") + "\n\n" + tekstBlok
           }
         ]
       })
@@ -602,14 +608,21 @@ document.getElementById("samenvattenBtn").addEventListener("click", async () => 
 
     const data = await response.json();
     if (data.error) {
-      samenvattingEl.textContent = "Fout: " + data.error.message;
+      samenvattingEl.textContent = vertaal(huidigeTaal, "algemeen_foutPrefix") + data.error.message;
       return;
     }
     const tekst = data.content.map((b) => b.text || "").join("\n");
     samenvattingEl.textContent = tekst;
   } catch (err) {
-    samenvattingEl.textContent = "Er ging iets mis: " + err.message;
+    samenvattingEl.textContent = vertaal(huidigeTaal, "algemeen_algemeneFoutPrefix") + err.message;
   }
+});
+
+taalSelectEl.addEventListener("change", async () => {
+  huidigeTaal = taalSelectEl.value;
+  await storage.set({ taal: huidigeTaal });
+  pasVertalingenToe(huidigeTaal);
+  renderAlles();
 });
 
 if (isChromeExtension) {
@@ -619,4 +632,10 @@ if (isChromeExtension) {
   });
 }
 
-laadState().then(renderAlles);
+laadState()
+  .then(async () => {
+    huidigeTaal = await haalOpgeslagenTaal();
+    taalSelectEl.value = huidigeTaal;
+    pasVertalingenToe(huidigeTaal);
+  })
+  .then(renderAlles);

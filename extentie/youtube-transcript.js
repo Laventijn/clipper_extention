@@ -37,7 +37,7 @@
   function vindMeerKnop() {
     return (
       document.querySelector("ytd-text-inline-expander tp-yt-paper-button#expand") ||
-      vindKnopMetLabel(/^\.{0,3}\s*meer\b|show more/i)
+      vindKnopMetLabel(/^\.{0,3}\s*(meer|plus)\b|show more/i)
     );
   }
 
@@ -54,7 +54,7 @@
       return;
     }
 
-    const transcriptKnop = vindKnopMetLabel(/transcript/i, /verberg|hide/i);
+    const transcriptKnop = vindKnopMetLabel(/transcript/i, /verberg|hide|masquer/i);
     if (transcriptKnop) {
       transcriptKnop.click();
       verwerkt = true;
