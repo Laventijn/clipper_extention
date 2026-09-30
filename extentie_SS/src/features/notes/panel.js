@@ -1,27 +1,31 @@
-// Zijpaneel om een notitie te bewerken. Alles zit in een Shadow DOM,
-// zodat de stijl van Smartschool en die van de extensie elkaar niet raken.
+// Notitiepaneel naast de pagina: de host is het laatste kind van #smscMain
+// (een flex-rij), waardoor de rest van de pagina vanzelf krimpt.
+// De inhoud zit in een Shadow DOM, zodat de CSS van Smartschool niet lekt.
 import { getStore, noteKey, createNote, isNoteEmpty, parseTags, STATUSES } from "../../storage/store.js";
+import { SEL } from "../../config/selectors.js";
 import { debug } from "../../core/dom.js";
 
 const AUTOSAVE_MS = 500;
+const GUARD_MS = 150;
+const PANEL_OPEN_KEY = "ssn:panelOpen";
 const STATUS_LABELS = { open: "Open", opgevolgd: "Opgevolgd" };
 
+// Inline op de host: stijlregels van Smartschool wegen zwaarder dan :host in de Shadow DOM.
+const HOST_STYLE =
+  "flex:0 0 340px;height:100%;min-width:0;overflow:auto;box-sizing:border-box;" +
+  "border-left:1px solid #ddd;background:#fff;font:inherit;";
+
 const CSS = `
-  :host { all: initial; font-size: inherit; font-family: inherit; }
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   .panel {
-    position: fixed; top: 0; right: 0; bottom: 0;
-    width: min(24em, 100vw); box-sizing: border-box;
     display: flex; flex-direction: column; gap: 0.75em;
-    padding: 1em 1.1em; overflow-y: auto;
+    min-height: 100%; padding: 1em 1.1em;
     background: #fff; color: #1f2328; line-height: 1.4;
     font-family: inherit; font-size: 1em;
-    border-left: 1px solid #d0d7de; box-shadow: -4px 0 16px rgba(0,0,0,.12);
-    z-index: 2147483000;
-    transform: translateX(100%); visibility: hidden;
-    transition: transform .2s ease, visibility 0s linear .2s;
   }
-  .panel.open { transform: none; visibility: visible; transition: transform .2s ease; }
-  @media (prefers-reduced-motion: reduce) { .panel, .panel.open { transition: none; } }
+  .content { display: flex; flex-direction: column; gap: 0.75em; flex: 1; }
+  .empty { margin: 0; color: #57606a; }
 
   header { display: flex; align-items: center; justify-content: space-between; gap: .5em; }
   h2 { margin: 0; font-size: 1.15em; }
@@ -37,13 +41,12 @@ const CSS = `
   label { display: block; font-weight: 600; font-size: .9em; margin-bottom: .25em; }
   .hint { font-weight: 400; color: #57606a; }
   textarea, input, select {
-    font: inherit; width: 100%; box-sizing: border-box;
+    font: inherit; width: 100%;
     padding: .45em .55em; border: 1px solid #d0d7de; border-radius: 6px;
     background: #fff; color: inherit;
   }
   textarea { min-height: 10em; resize: vertical; }
   .link-open { display: inline-block; margin-top: .3em; font-size: .9em; color: #0969da; overflow-wrap: anywhere; }
-  .link-open[hidden] { display: none; }
 
   :focus-visible { outline: 2px solid #1a73e8; outline-offset: 1px; }
 
@@ -98,14 +101,19 @@ function setVal(input, value) {
 // --- Toestand ---------------------------------------------------------------
 
 let ui = null;          // DOM-referenties, lui opgebouwd
-let ctx = null;         // { info, key, note } van het geopende bericht
+let open = false;       // paneel zichtbaar
+let ctx = null;         // { info, key, note } van het getoonde bericht
 let dirty = false;      // onbewaarde wijzigingen
 let saveTimer = null;
 let inflight = null;    // lopende bewaring (Promise)
+let openSeq = 0;        // laatste openPanel-aanroep wint
 let returnFocusTo = null;
+let placeWarned = false;
 
 function build() {
   const host = el("div", { id: "ssn-panel-host" });
+  host.style.cssText = HOST_STYLE;
+  host.style.display = "none";
   const root = host.attachShadow({ mode: "open" });
 
   const f = {};
@@ -121,12 +129,9 @@ function build() {
   f.status = el("select", { id: "status" },
     ...STATUSES.map((s) => el("option", { value: s, text: STATUS_LABELS[s] || s })));
   f.saved = el("div", { class: "saved", role: "status", "aria-live": "polite" });
+  f.empty = el("p", { class: "empty", text: "Selecteer een bericht of klik op 📝 om een notitie te maken." });
 
-  const panel = el("aside", { class: "panel", role: "dialog", "aria-modal": "false", "aria-labelledby": "title" },
-    el("header", {},
-      f.title,
-      el("button", { type: "button", class: "icon-btn", "aria-label": "Paneel sluiten", title: "Sluiten (Esc)", text: "×", onclick: () => closePanel() }),
-    ),
+  f.content = el("div", { class: "content", hidden: "" },
     el("dl", {},
       el("dt", { text: "Onderwerp" }), f.subject,
       f.fromLabel, f.from,
@@ -144,7 +149,15 @@ function build() {
       ),
     ),
   );
-  panel.inert = true;
+
+  const panel = el("aside", { class: "panel", "aria-labelledby": "title" },
+    el("header", {},
+      f.title,
+      el("button", { type: "button", class: "icon-btn", "aria-label": "Paneel sluiten", title: "Sluiten (Esc)", text: "×", onclick: () => closePanel() }),
+    ),
+    f.empty,
+    f.content,
+  );
 
   root.append(el("style", { text: CSS }), panel);
 
@@ -171,27 +184,65 @@ function build() {
 
   // Escape terwijl de focus buiten het paneel staat.
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && isOpen()) closePanel();
+    if (e.key === "Escape" && open) closePanel();
   });
-  // Bewaar wanneer het tabblad verborgen wordt of de pagina sluit.
+  // Bewaar wanneer het tabblad verborgen wordt.
   document.addEventListener("visibilitychange", () => { if (document.hidden) saveNow(); });
 
-  document.body.append(host);
   ui = { host, panel, f };
+  place();
+  startPlacementGuard();
 
   getStore().then((store) => store.onChange(onStoreChange)).catch((err) => debug("onChange mislukt", err));
 }
 
-function isOpen() {
-  return !!ui && ui.panel.classList.contains("open");
+// --- Plaatsing in #smscMain ------------------------------------------------------
+
+function isPlaced() {
+  const main = document.querySelector(SEL.main);
+  return !main || (ui.host.parentElement === main && main.lastElementChild === ui.host);
 }
+
+/** Zet de host als laatste kind van #smscMain. Doet niets als #smscMain ontbreekt. */
+function place() {
+  const main = document.querySelector(SEL.main);
+  if (!main) {
+    if (!placeWarned) debug("#smscMain niet gevonden, paneel wacht tot het verschijnt.");
+    placeWarned = true;
+    return;
+  }
+  placeWarned = false;
+  if (!isPlaced()) main.append(ui.host);
+}
+
+/** Smartschool bouwt #smscMain soms opnieuw op: plaats de host terug als hij verdwenen is. */
+function startPlacementGuard() {
+  let timer = null;
+  const observer = new MutationObserver(() => {
+    if (timer || isPlaced()) return;
+    timer = setTimeout(() => {
+      timer = null;
+      place();
+    }, GUARD_MS);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+function setOpen(value, persist = true) {
+  open = value;
+  ui.host.style.display = value ? "block" : "none";
+  if (value) place();
+  if (persist) chrome.storage.local.set({ [PANEL_OPEN_KEY]: value }).catch((err) => debug("panelOpen bewaren mislukt", err));
+}
+
+// --- Formulier -----------------------------------------------------------------
 
 function updateLinkPreview() {
   const href = safeHref(ui.f.link.value);
   ui.f.linkOpen.hidden = !href;
   if (href) {
     ui.f.linkOpen.href = href;
-    ui.f.linkOpen.textContent = `Open link ↗`;
+    ui.f.linkOpen.textContent = "Open link ↗";
     ui.f.linkOpen.title = href;
   } else {
     ui.f.linkOpen.removeAttribute("href");
@@ -208,8 +259,15 @@ function showError(message) {
   ui.f.saved.textContent = message;
 }
 
+function showEmpty() {
+  ui.f.content.hidden = true;
+  ui.f.empty.hidden = false;
+}
+
 function fillForm(info, note) {
   const { f } = ui;
+  f.content.hidden = false;
+  f.empty.hidden = true;
   f.subject.textContent = info.subject || note?.subject || "(geen onderwerp)";
   f.fromLabel.textContent = info.box === "outbox" ? "Aan" : "Van";
   f.from.textContent = info.name || note?.from || "";
@@ -239,6 +297,8 @@ function onEdit() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveNow, AUTOSAVE_MS);
 }
+
+// --- Bewaren en verwijderen -------------------------------------------------------
 
 async function saveNow() {
   clearTimeout(saveTimer);
@@ -297,7 +357,8 @@ async function deleteNote() {
       await store.remove(current.key);
       current.note = null;
     }
-    if (ctx === current) closePanel();
+    // Het paneel blijft open en toont een leeg formulier voor dit bericht.
+    if (ctx === current) fillForm(current.info, null);
   } catch (err) {
     debug("Verwijderen mislukt", err);
     if (ctx === current) showError("Verwijderen mislukt.");
@@ -314,30 +375,46 @@ function onStoreChange({ key, newValue }) {
 // --- Publieke API -------------------------------------------------------------
 
 /**
- * Opent het paneel voor een bericht.
+ * Toont de notitie van een bericht en opent het paneel als het dicht is.
+ * Een openstaande wijziging wordt eerst direct bewaard.
  * @param {{msgId: string, box: string, subject: string, name: string, date: string}} info
- * @param {HTMLElement} [opener] element dat de focus terugkrijgt bij sluiten
+ * @param {{opener?: HTMLElement, focus?: boolean}} [options]
+ *   opener: krijgt de focus terug bij sluiten; focus: cursor in het tekstvak (standaard true)
  */
-export async function openPanel(info, opener) {
+export async function openPanel(info, { opener, focus = true } = {}) {
   if (!ui) build();
-  await saveNow(); // eventueel openstaande notitie eerst bewaren
+  const seq = ++openSeq;
+  if (opener) returnFocusTo = opener;
 
   const key = noteKey(location.host, info.box, info.msgId);
+
+  // Zelfde bericht: niets herladen, zodat wat je typt niet overschreven wordt.
+  if (ctx?.key === key) {
+    ctx.info = info;
+    setOpen(true);
+    if (focus) ui.f.text.focus();
+    return;
+  }
+
+  await saveNow();
+  if (seq !== openSeq) return; // intussen een nieuwer verzoek
+  if (dirty) {
+    // Bewaren mislukte: blijf bij de huidige notitie zodat er niets verloren gaat.
+    setOpen(true);
+    return;
+  }
+
   const current = { info, key, note: null };
   ctx = current;
-  dirty = false;
-  returnFocusTo = opener || null;
-
+  setOpen(true);
   fillForm(info, null);
   ui.f.saved.textContent = "Laden…";
-  ui.panel.inert = false;
-  ui.panel.classList.add("open");
-  ui.f.text.focus();
+  if (focus) ui.f.text.focus();
 
   try {
     const store = await getStore();
     const note = await store.get(key);
-    if (ctx !== current) return; // intussen een ander bericht geopend
+    if (ctx !== current) return; // intussen een ander bericht
     current.note = note;
     if (!dirty) fillForm(info, note);
     else showSaved(note);
@@ -347,12 +424,42 @@ export async function openPanel(info, opener) {
   }
 }
 
+/** Toont de notitie van het geselecteerde bericht, maar alleen als het paneel open staat. */
+export function followSelection(info) {
+  if (!open) return;
+  openPanel(info, { focus: false }).catch((err) => debug("Selectie volgen mislukt", err));
+}
+
 export async function closePanel() {
-  if (!isOpen()) return;
+  if (!ui || !open) return;
+  openSeq++; // annuleer een openPanel dat nog wacht
   await saveNow();
-  ui.panel.classList.remove("open");
-  ui.panel.inert = true;
+  setOpen(false);
   ctx = null;
   if (returnFocusTo?.isConnected) returnFocusTo.focus();
   returnFocusTo = null;
+}
+
+/**
+ * Herstelt de open/dicht-toestand van de vorige keer.
+ * Staat het paneel open, dan toont het meteen de notitie van het geselecteerde bericht.
+ * @param {() => object|null} getSelectedInfo
+ */
+export async function initPanel(getSelectedInfo) {
+  let wasOpen = false;
+  try {
+    wasOpen = !!(await chrome.storage.local.get(PANEL_OPEN_KEY))[PANEL_OPEN_KEY];
+  } catch (err) {
+    debug("panelOpen lezen mislukt", err);
+  }
+  if (!wasOpen) return;
+
+  if (!ui) build();
+  const info = getSelectedInfo();
+  if (info) {
+    await openPanel(info, { focus: false });
+  } else {
+    showEmpty();
+    setOpen(true, false);
+  }
 }

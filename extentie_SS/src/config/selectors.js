@@ -5,6 +5,10 @@ export const SEL = {
   // Containers
   frame: "#messageframe",          // ouder van de lijst, blijft bestaan
   list: "#msglist",                // wordt via AJAX herladen of vervangen
+  main: "#smscMain",               // flex-rij in body; het notitiepaneel komt hier als laatste kind in
+
+  // Geselecteerd bericht (aria-selected="true" op de rij)
+  selectedRow: "#msglist div.modern-message[aria-selected='true']",
 
   // Eén rij per bericht
   row: "div.modern-message",
@@ -22,6 +26,7 @@ export const ATTR = {
   msgId: "msgid",                  // "row_9517330"
   realBox: "realbox",              // inbox | outbox | ...
   itemType: "itemtype",            // "message"
+  selected: "aria-selected",       // "true" bij het geselecteerde bericht
 };
 
 export const ROW_ID_PREFIX = "row_";

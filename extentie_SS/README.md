@@ -32,14 +32,15 @@ Na een wijziging aan de code: klik bij de extensie op **Opnieuw laden** (↻) en
 ## Gebruik
 
 1. In de berichtenlijst staat bij elk bericht een 📝-knop.
-2. Klik erop. Het bericht opent niet, maar rechts schuift een paneel open.
+2. Klik erop. Het bericht opent niet, maar rechts naast de pagina verschijnt het notitiepaneel. De pagina krimpt mee.
 3. Vul in wat je wil:
    - **Notitie**: vrije tekst
    - **Link / meer info**: een URL, die klikbaar wordt
    - **Tags**: kommagescheiden, bv. `ict, dringend`
    - **Status**: open of opgevolgd
 4. Bewaren gaat automatisch na een halve seconde zonder typen. **Ctrl+S** bewaart meteen. Onderaan staat wanneer de notitie laatst bewaard is.
-5. **Escape** of **Sluiten** sluit het paneel. **Verwijderen** vraagt eerst een bevestiging.
+5. Staat het paneel open en klik je op een ander bericht, dan toont het meteen de notitie van dat bericht. Een gewijzigde notitie wordt eerst bewaard.
+6. **Escape**, **×** of **Sluiten** sluit het paneel. Het onthoudt of het open of dicht stond. **Verwijderen** vraagt eerst een bevestiging.
 
 Een notitie blijft aan het bericht hangen, ook als het bericht naar het archief of een eigen map verplaatst wordt. Smartschool houdt het bericht-ID dan gelijk (getest op 30/09/2026).
 

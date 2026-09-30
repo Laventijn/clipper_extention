@@ -32,7 +32,7 @@ export function attachNoteButton(row, info) {
     e.preventDefault();
     e.stopPropagation();
     // Lees de rij opnieuw: Smartschool kan de inhoud intussen bijgewerkt hebben.
-    openPanel(getRowInfo(row) || info, btn).catch((err) => debug("Paneel openen mislukt", err));
+    openPanel(getRowInfo(row) || info, { opener: btn }).catch((err) => debug("Paneel openen mislukt", err));
   });
 
   actions.prepend(btn);

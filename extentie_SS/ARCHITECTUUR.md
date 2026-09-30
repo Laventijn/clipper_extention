@@ -42,7 +42,8 @@ extentie_SS/
     storage/store.js           contract, datamodel, keuze van de opslag
     storage/localStore.js      implementatie met chrome.storage.local
     features/notes/button.js   📝-knop per rij
-    features/notes/panel.js    zijpaneel in Shadow DOM
+    core/selection.js          geselecteerd bericht (aria-selected + klik)
+    features/notes/panel.js    notitiepaneel naast de pagina, Shadow DOM
 ```
 
 Nog te bouwen (zie de status in de README):
@@ -64,7 +65,8 @@ Nog te bouwen (zie de status in de README):
 | `storage/store.js` | Contract van de opslag, `noteKey()`, `createNote()`, `normalizeNote()`, `parseTags()` en `getStore()`. |
 | `storage/localStore.js` | Implementatie van het contract met `chrome.storage.local`. |
 | `features/notes/button.js` | `attachNoteButton(row, info)` en `hasNoteButton(row)`. |
-| `features/notes/panel.js` | `openPanel(info, opener)` en `closePanel()`. Bouwt het paneel lui op bij de eerste klik. |
+| `core/selection.js` | `watchSelection(onSelect)`: meldt elk geselecteerd bericht en levert `getSelectedInfo()`. |
+| `features/notes/panel.js` | `openPanel(info, { opener, focus })`, `followSelection(info)`, `closePanel()` en `initPanel()`. Bouwt het paneel lui op en plaatst het in `#smscMain`. |
 
 ## Opstarten en modules
 
@@ -89,28 +91,41 @@ Een **enhancer** is een functie `(row, info) => void`. Een nieuwe functie per ri
 - Een rij opent een bericht via een inline `onclick` (`oTriggers.showMessage`). De knop stopt daarom `click` (en `mousedown`, `pointerdown`, `dblclick`) met `stopPropagation()`. Zo opent het bericht niet en start er geen sleepactie naar een map.
 - Bij een klik wordt de rij opnieuw gelezen met `getRowInfo(row)`, omdat Smartschool de rij intussen kan bijgewerkt hebben.
 
-## Het zijpaneel
+## Het notitiepaneel
 
-- **Shadow DOM** op een host `#ssn-panel-host` in `body`. De stijl van Smartschool en die van het paneel beïnvloeden elkaar niet. Lettertype en lettergrootte worden wel overgeërfd, zodat het paneel de lettergrootte van de pagina volgt.
+- **Naast de pagina, niet erover**: de host `#ssn-panel-host` is het laatste kind van `#smscMain` (een flex-rij in `body`). Inline stijl: `flex: 0 0 340px; height: 100%; min-width: 0; overflow: auto; border-left: 1px solid #ddd`. De rest van de pagina krimpt dan vanzelf. Er is geen `position: fixed`. De stijl staat inline op de host, omdat regels van Smartschool zwaarder wegen dan `:host` in de Shadow DOM.
+- **Shadow DOM** in de host: de CSS van Smartschool en die van het paneel beïnvloeden elkaar niet. Lettertype en lettergrootte worden wel overgeërfd.
+- **Plaatsing bewaken**: Smartschool bouwt `#smscMain` soms opnieuw op. Een `MutationObserver` op `body` (debounce 150 ms) controleert of de host nog het laatste kind van `#smscMain` is en plaatst hem anders terug. Ontbreekt `#smscMain`, dan doet de extensie niets en wacht ze tot het verschijnt.
+- **Open of dicht**: sluiten zet de host op `display: none`, waardoor de pagina de ruimte weer inneemt. De toestand staat in `chrome.storage.local` onder de sleutel `ssn:panelOpen`. Bij het laden van de pagina wordt ze hersteld.
+- **Volgt het geselecteerde bericht** (alleen als het paneel open staat):
+  - `core/selection.js` observeert attribuutwijzigingen van `aria-selected` in de berichtenlijst (`subtree`, `attributeFilter`). Terugval: een klik op een rij (niet op checkbox, knop of link).
+  - Het paneel toont meteen de notitie van dat bericht, of een leeg formulier als er geen is.
+  - Een gewijzigde notitie wordt eerst direct bewaard, zonder wachttijd. Mislukt dat, dan blijft het paneel bij de huidige notitie en toont het een fout, zodat er niets verloren gaat.
+  - Is het bericht al getoond, dan wordt het formulier niet herladen. Wat je typt wordt dus nooit overschreven door een dubbele melding.
+  - Een klik op 📝 opent het paneel voor die rij, ook als ze niet geselecteerd is. Alleen de 📝-klik zet de cursor in het tekstvak, het volgen van de selectie niet.
+  - Bij snel na elkaar wisselen wint de laatste aanvraag (`openSeq`).
+- **Bovenaan** staan altijd onderwerp, afzender (of "Aan" in Verzonden) en datum van het bericht waar de notitie bij hoort.
 - **Geen `innerHTML`**: alle DOM wordt opgebouwd met `createElement` en `textContent` (helper `el()`).
 - **Links**: `safeHref()` laat alleen `http(s)` toe (dus geen `javascript:`). Zonder schema wordt `https://` toegevoegd.
 - **Toestand**:
-  - `ctx = { info, key, note }` voor het geopende bericht
+  - `ctx = { info, key, note }` voor het getoonde bericht
+  - `open` voor de zichtbaarheid
   - `dirty` voor onbewaarde wijzigingen
   - `saveTimer` voor de autosave
   - `inflight` voor een lopende bewaring
 - **Bewaren**:
-  - na 500 ms zonder typen, met Ctrl+S, bij sluiten, bij het openen van een ander bericht en wanneer het tabblad verborgen wordt
+  - na 500 ms zonder typen, met Ctrl+S, bij sluiten, bij het wisselen van bericht en wanneer het tabblad verborgen wordt
   - een nieuwe notitie zonder inhoud wordt niet bewaard
   - een bewaring wacht op de vorige, zodat ze altijd op de recentste versie verderbouwt
   - na elke `await` controleert de code of `ctx` nog hetzelfde bericht is
-- **Verwijderen**: vraagt bevestiging als er inhoud is en wacht op een lopende bewaring. Zo duikt een notitie na het verwijderen niet opnieuw op.
+- **Verwijderen**: vraagt bevestiging als er inhoud is en wacht op een lopende bewaring. Het paneel blijft open en toont daarna een leeg formulier voor hetzelfde bericht.
 - **Toetsenbord**:
   - Escape sluit het paneel, zowel met de focus in het paneel als erbuiten.
-  - Bij sluiten gaat de focus terug naar de 📝-knop.
-  - Een gesloten paneel is `inert`, dus niet bereikbaar met Tab.
+  - Bij sluiten gaat de focus terug naar de 📝-knop, als het paneel via die knop geopend is.
+  - Een gesloten paneel is `display: none`, dus niet bereikbaar met Tab.
 - **Toetsen afschermen**: `keydown`, `keyup` en `keypress` worden op de host gestopt. Buiten de Shadow DOM lijkt het doel van een toetsaanslag de host-`div` en geen tekstvak. Anders zouden sneltoetsen van Smartschool (bv. Delete) kunnen afgaan terwijl je typt.
 - **Synchronisatie**: via `store.onChange` werkt het paneel zich bij als dezelfde notitie elders wijzigt (ander tabblad, options-pagina). Dat gebeurt niet als er onbewaarde wijzigingen zijn.
+- **Sleutel**: altijd `note:{host}:{realbox}:{msgId}`, nooit het mapnummer.
 
 ## Opslag
 
@@ -160,7 +175,57 @@ note:decampusschoolgent.smartschool.be:inbox:9517330
 }
 ```
 
-`from` bevat in Verzonden de ontvanger(s): het is de naam uit de rij. Verandert het model, verhoog dan `schemaVersion` en vang oude versies op in `normalizeNote()`.
+Uitleg per veld:
+
+| Veld | Type | Inhoud | Waar het vandaan komt |
+|---|---|---|---|
+| `schemaVersion` | getal | Versie van het datamodel, nu `1` | Vast, gezet bij elke bewaring |
+| `key` | tekst | `note:decampusschoolgent.smartschool.be:inbox:9517330` | Berekend uit host, box en msgId |
+| `host` | tekst | Smartschool-domein, bv. `decampusschoolgent.smartschool.be` | `location.host` |
+| `box` | tekst | Type van de box: `inbox`, `outbox`, ... (niet de map) | Attribuut `realbox` van de rij |
+| `msgId` | tekst | Bericht-ID, bv. `9517330` | Attribuut `msgid`, zonder `row_` |
+| `subject` | tekst | Onderwerp van het bericht | Kopie uit de rij |
+| `from` | tekst | Afzender, of ontvanger(s) in Verzonden | Kopie uit de rij (`.modern-message__name`) |
+| `date` | tekst | Datum van het bericht, bv. `2026-09-25 14:51` | Kopie uit de rij |
+| `text` | tekst | De notitie zelf | Ingevuld door de gebruiker |
+| `link` | tekst | URL bij "Link / meer info" | Ingevuld door de gebruiker |
+| `tags` | lijst van tekst | Bv. `["ict", "dringend"]`, zonder dubbels | Ingevuld door de gebruiker (kommagescheiden) |
+| `status` | tekst | `open` of `opgevolgd` | Gekozen door de gebruiker, standaard `open` |
+| `createdAt` | ISO-datum | Moment van de eerste bewaring | Automatisch |
+| `updatedAt` | ISO-datum | Moment van de laatste bewaring | Automatisch |
+| `replyMsgId` | tekst of `null` | ID van het antwoord in Verzonden | Nu altijd `null`, bedoeld voor fase 2 |
+
+Voorbeeld van een volledig record:
+
+```json
+{
+  "schemaVersion": 1,
+  "key": "note:decampusschoolgent.smartschool.be:inbox:9517330",
+  "host": "decampusschoolgent.smartschool.be",
+  "box": "inbox",
+  "msgId": "9517330",
+  "subject": "Laptopkar",
+  "from": "Jan Janssens",
+  "date": "2026-09-25 14:51",
+  "text": "Vrijdag nakijken of lader 3 vervangen is.",
+  "link": "https://example.com/ticket/123",
+  "tags": ["ict", "dringend"],
+  "status": "open",
+  "createdAt": "2026-09-30T08:12:04.512Z",
+  "updatedAt": "2026-09-30T08:15:40.101Z",
+  "replyMsgId": null
+}
+```
+
+Wat **niet** bewaard wordt: de inhoud (body) van het bericht, bijlagen en ontvangers in cc/bcc. Alleen onderwerp, naam en datum worden uit de rij gekopieerd.
+
+Persoonsgegevens: `from` bevat altijd een naam en in `text` kan de gebruiker vrij over leerlingen of collega's schrijven. Dat telt mee voor het verwerkingsregister bij een latere centrale database.
+
+Bij elke bewaring worden `subject`, `from` en `date` opnieuw uit de rij gehaald. Is de rij leeg, dan blijft de oude waarde staan. In Verzonden bevat `from` de ontvanger(s).
+
+Naast de notities bestaan er twee sleutels zonder notitiegegevens: `settings` met `{ storage: "local" }` (de keuze van de opslag) en `ssn:panelOpen` (`true` of `false`, of het paneel open stond). Ze zitten niet in export of import.
+
+Verandert het model, verhoog dan `schemaVersion` en vang oude versies op in `normalizeNote()`.
 
 ### Import
 
@@ -185,6 +250,8 @@ note:decampusschoolgent.smartschool.be:inbox:9517330
 | `.modern-message__name` / `__subject` / `__date` | Info voor het paneel |
 | `.modern-message__icons` | Plaats van de indicator (stap 3) |
 | `.modern-message__icon--replied` | Hook voor fase 2 |
+| `#smscMain` | Flex-rij waarin het paneel als laatste kind komt |
+| `[aria-selected="true"]` op de rij | Geselecteerd bericht |
 
 De globale objecten van de pagina (`oTriggers`, `oMessageList`, `oEnvironment`, ...) worden **niet** gebruikt. Een content script kan er niet aan, en een script in de MAIN world is voorlopig niet nodig.
 
