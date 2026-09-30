@@ -138,7 +138,10 @@ function normaliseerItem(item) {
     ...item,
     id: item.id || maakId(),
     type: item.type || "tekst",
-    verborgen: Boolean(item.verborgen)
+    verborgen: Boolean(item.verborgen),
+    verwerkt: Boolean(item.verwerkt),
+    prioriteit: [1, 2, 3].includes(item.prioriteit) ? item.prioriteit : 0,
+    extraInfo: Array.isArray(item.extraInfo) ? item.extraInfo : []
   };
 }
 
@@ -188,7 +191,7 @@ function laadItems() {
 
   items.slice().reverse().forEach((item) => {
     const div = document.createElement("div");
-    div.className = `item${item.verborgen ? " verborgen" : ""}`;
+    div.className = `item${item.verborgen ? " verborgen" : ""}${item.verwerkt ? " verwerkt" : ""}`;
     const datum = new Date(item.datum).toLocaleString(huidigeTaal);
     const bron = item.bron || item.paginaUrl || "";
     const type = item.type || "tekst";
@@ -197,6 +200,38 @@ function laadItems() {
     const gepubliceerd = item.gepubliceerdOp ? formatteerGepubliceerdOp(item.gepubliceerdOp) : "";
     const wisselLabel = vertaal(huidigeTaal, item.verborgen ? "popup_uitklappen" : "popup_inklappen");
     const verwijderLabel = vertaal(huidigeTaal, "algemeen_verwijderen");
+    const verwerktLabel = vertaal(huidigeTaal, "popup_verwerktLabel");
+    const prioriteitLabel = vertaal(huidigeTaal, "popup_prioriteitLabel");
+
+    const extraInfoHtml = item.extraInfo.length
+      ? `
+        <div class="extraInfoLijst">
+          <div class="extraInfoTitel">${escapeHtml(vertaal(huidigeTaal, "popup_extraInfoTitel"))} (${item.extraInfo.length})</div>
+          ${item.extraInfo
+            .map((extra) => {
+              const verwijderLabelExtra = vertaal(huidigeTaal, "popup_verwijderExtraInfo");
+              return `
+                <div class="extraInfoItem">
+                  <div class="extraInfoInhoud">
+                    <div class="extraInfoTekst">${escapeHtml(extra.tekst || "")}</div>
+                    ${extra.bron ? `<div class="bron"><a href="${escapeAttr(extra.bron)}" target="_blank" rel="noreferrer">${escapeHtml(vertaal(huidigeTaal, "popup_openBron"))}</a><br>${escapeHtml(korteUrl(extra.bron))}</div>` : ""}
+                  </div>
+                  <button type="button" class="icoonKnop vuilbak" data-actie="verwijderExtraInfo" data-id="${escapeAttr(item.id)}" data-extra-id="${escapeAttr(extra.id)}" title="${escapeAttr(verwijderLabelExtra)}" aria-label="${escapeAttr(verwijderLabelExtra)}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 6h18"></path>
+                      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                      <line x1="10" y1="11" x2="10" y2="17"></line>
+                      <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                  </button>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      `
+      : "";
 
     const inhoud = item.verborgen
       ? ""
@@ -205,12 +240,22 @@ function laadItems() {
         ${item.beschrijving ? `<div class="beschrijving">${escapeHtml(item.beschrijving)}</div>` : ""}
         ${bron ? `<div class="bron"><a href="${escapeAttr(bron)}" target="_blank" rel="noreferrer">${escapeHtml(vertaal(huidigeTaal, "popup_openBron"))}</a><br>${escapeHtml(korteUrl(bron))}</div>` : ""}
         ${item.screenshot ? `<img class="screenshot" src="${escapeAttr(item.screenshot)}" alt="${escapeAttr(vertaal(huidigeTaal, "popup_screenshotAlt"))}">` : ""}
+        ${extraInfoHtml}
       `;
 
     div.innerHTML = `
       <div class="itemKop">
         <button type="button" class="icoonKnop" data-actie="wissel" data-id="${escapeAttr(item.id)}" title="${escapeAttr(wisselLabel)}" aria-label="${escapeAttr(wisselLabel)}">${item.verborgen ? "+" : "−"}</button>
         <div class="meta">${escapeHtml(item.platform || vertaal(huidigeTaal, "algemeen_onbekend"))} · ${datum} · ${escapeHtml(type)}${extraMeta ? ` · ${extraMeta}` : ""}${gepubliceerd ? ` · ${escapeHtml(vertaal(huidigeTaal, "popup_gepubliceerd"))} ${escapeHtml(gepubliceerd)}` : ""}</div>
+        <button type="button" class="icoonKnop ster${item.prioriteit ? " actief" : ""}" data-actie="prioriteit" data-id="${escapeAttr(item.id)}" title="${escapeAttr(prioriteitLabel)}" aria-label="${escapeAttr(prioriteitLabel)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+          ${item.prioriteit ? `<span class="sterCijfer">${item.prioriteit}</span>` : ""}
+        </button>
+        <label class="verwerktLabel" title="${escapeAttr(verwerktLabel)}">
+          <input type="checkbox" class="verwerktCheckbox" data-actie="verwerkt" data-id="${escapeAttr(item.id)}" aria-label="${escapeAttr(verwerktLabel)}" ${item.verwerkt ? "checked" : ""} />
+        </label>
         <button type="button" class="icoonKnop vuilbak" data-actie="verwijder" data-id="${escapeAttr(item.id)}" title="${escapeAttr(verwijderLabel)}" aria-label="${escapeAttr(verwijderLabel)}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 6h18"></path>
@@ -428,8 +473,25 @@ lijstEl.addEventListener("click", async (event) => {
     project.items = project.items.filter((record) => record.id !== item.id);
   } else if (button.dataset.actie === "wissel") {
     item.verborgen = !item.verborgen;
+  } else if (button.dataset.actie === "verwijderExtraInfo") {
+    item.extraInfo = item.extraInfo.filter((extra) => extra.id !== button.dataset.extraId);
+  } else if (button.dataset.actie === "prioriteit") {
+    item.prioriteit = (item.prioriteit + 1) % 4;
   }
 
+  await bewaarState();
+  renderAlles();
+});
+
+lijstEl.addEventListener("change", async (event) => {
+  const checkbox = event.target.closest('input[data-actie="verwerkt"]');
+  if (!checkbox) return;
+
+  const project = actiefProject();
+  const item = project.items.find((record) => record.id === checkbox.dataset.id);
+  if (!item) return;
+
+  item.verwerkt = checkbox.checked;
   await bewaarState();
   renderAlles();
 });
@@ -454,6 +516,8 @@ document.getElementById("exportBtn").addEventListener("click", async () => {
     [
       vertaal(huidigeTaal, "csv_project"),
       vertaal(huidigeTaal, "csv_geminimaliseerd"),
+      vertaal(huidigeTaal, "csv_verwerkt"),
+      vertaal(huidigeTaal, "csv_prioriteit"),
       vertaal(huidigeTaal, "csv_type"),
       vertaal(huidigeTaal, "csv_platform"),
       vertaal(huidigeTaal, "csv_datum"),
@@ -472,6 +536,8 @@ document.getElementById("exportBtn").addEventListener("click", async () => {
     rijen.push([
       project.naam,
       i.verborgen ? vertaal(huidigeTaal, "algemeen_ja") : vertaal(huidigeTaal, "algemeen_nee"),
+      i.verwerkt ? vertaal(huidigeTaal, "algemeen_ja") : vertaal(huidigeTaal, "algemeen_nee"),
+      i.prioriteit || "",
       i.type || "tekst",
       i.platform,
       i.datum,
@@ -508,7 +574,13 @@ function bouwProjectTekstBlok(project, items) {
     .map((i) => {
       const screenshotInfo = i.screenshot ? " [screenshot bewaard]" : "";
       const platform = i.platform || vertaal(huidigeTaal, "algemeen_onbekend");
-      return `[${project.naam} · ${platform} · ${i.type || "tekst"} · ${new Date(i.datum).toLocaleDateString(huidigeTaal)}] ${i.tekst}${screenshotInfo}\nBron: ${i.bron || i.paginaUrl || ""}`;
+      const extraInfoBlok = (i.extraInfo || [])
+        .map((extra) => `  - ${extra.tekst}${extra.bron ? ` (${extra.bron})` : ""}`)
+        .join("\n");
+      const extraInfoSuffix = extraInfoBlok
+        ? `\n${vertaal(huidigeTaal, "popup_extraInfoTitel")}:\n${extraInfoBlok}`
+        : "";
+      return `[${project.naam} · ${platform} · ${i.type || "tekst"} · ${new Date(i.datum).toLocaleDateString(huidigeTaal)}] ${i.tekst}${screenshotInfo}\nBron: ${i.bron || i.paginaUrl || ""}${extraInfoSuffix}`;
     })
     .join("\n\n");
 }

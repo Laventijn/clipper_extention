@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Smartschool Notities",
+  "version": "0.1.0",
+  "description": "Voeg lokale notities toe aan berichten in Smartschool.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://*.smartschool.be/*"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.smartschool.be/*"],
+      "js": ["src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/*.js", "src/*/*.js", "src/*/*/*.js"],
+      "matches": ["https://*.smartschool.be/*"]
+    }
+  ]
+}

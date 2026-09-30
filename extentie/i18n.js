@@ -113,7 +113,16 @@ const VERTALINGEN = {
 
     menu_voegSelectie: "Voeg geselecteerde tekst toe aan opvolglijst",
     menu_bewaarLink: "Bewaar deze link in opvolglijst",
-    menu_maakScreenshot: "Maak screenshot voor opvolglijst"
+    menu_maakScreenshot: "Maak screenshot voor opvolglijst",
+    menu_voegExtraInfo: "Voeg selectie toe als extra info bij laatste record",
+
+    popup_extraInfoTitel: "Extra info",
+    popup_verwijderExtraInfo: "Extra info verwijderen",
+    popup_verwerktLabel: "Verwerkt",
+    popup_prioriteitLabel: "Prioriteit (klik om te wijzigen)",
+
+    csv_verwerkt: "verwerkt",
+    csv_prioriteit: "prioriteit"
   },
 
   en: {
@@ -230,7 +239,16 @@ const VERTALINGEN = {
 
     menu_voegSelectie: "Add selected text to follow-up list",
     menu_bewaarLink: "Save this link to follow-up list",
-    menu_maakScreenshot: "Take screenshot for follow-up list"
+    menu_maakScreenshot: "Take screenshot for follow-up list",
+    menu_voegExtraInfo: "Add selection as extra info to last record",
+
+    popup_extraInfoTitel: "Extra info",
+    popup_verwijderExtraInfo: "Remove extra info",
+    popup_verwerktLabel: "Processed",
+    popup_prioriteitLabel: "Priority (click to change)",
+
+    csv_verwerkt: "processed",
+    csv_prioriteit: "priority"
   },
 
   fr: {
@@ -347,7 +365,16 @@ const VERTALINGEN = {
 
     menu_voegSelectie: "Ajouter le texte sélectionné à la liste de suivi",
     menu_bewaarLink: "Enregistrer ce lien dans la liste de suivi",
-    menu_maakScreenshot: "Faire une capture d'écran pour la liste de suivi"
+    menu_maakScreenshot: "Faire une capture d'écran pour la liste de suivi",
+    menu_voegExtraInfo: "Ajouter la sélection comme info supplémentaire au dernier enregistrement",
+
+    popup_extraInfoTitel: "Info supplémentaire",
+    popup_verwijderExtraInfo: "Supprimer l'info supplémentaire",
+    popup_verwerktLabel: "Traité",
+    popup_prioriteitLabel: "Priorité (cliquer pour changer)",
+
+    csv_verwerkt: "traite",
+    csv_prioriteit: "priorite"
   }
 };
 

@@ -27,6 +27,12 @@ async function herbouwContextMenus() {
       title: vertaal(taal, "menu_maakScreenshot"),
       contexts: ["page", "selection", "link"]
     });
+
+    chrome.contextMenus.create({
+      id: "voegExtraInfoToeAanLaatsteRecord",
+      title: vertaal(taal, "menu_voegExtraInfo"),
+      contexts: ["selection"]
+    });
   });
 }
 
@@ -40,14 +46,21 @@ chrome.storage.onChanged.addListener((changes, area) => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!tab?.url) return;
 
+  if (info.menuItemId === "voegExtraInfoToeAanLaatsteRecord" && info.selectionText) {
+    const bron = await bepaalPaginaBron(tab);
+    await voegExtraInfoToeAanLaatsteRecord(tab, info.selectionText.trim(), bron);
+    return;
+  }
+
   const meta = await haalPaginaMeta(tab.id);
+  const bron = await bepaalPaginaBron(tab);
   let nieuwItem = null;
 
   if (info.menuItemId === "voegSelectieToeAanOpvolglijst" && info.selectionText) {
     nieuwItem = maakBasisItem(tab, {
       type: "tekst",
       tekst: info.selectionText.trim(),
-      bron: tab.url,
+      bron,
       meta
     });
   }
@@ -66,7 +79,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     nieuwItem = maakBasisItem(tab, {
       type: "screenshot",
       tekst: info.selectionText?.trim() || tab.title || tab.url,
-      bron: tab.url,
+      bron,
       screenshot,
       meta
     });
@@ -116,6 +129,32 @@ async function laadProjectState() {
   return { projecten, actiefProjectId };
 }
 
+async function voegExtraInfoToeAanLaatsteRecord(tab, tekst, bron) {
+  const state = await laadProjectState();
+  const project = state.projecten.find((p) => p.id === state.actiefProjectId) || state.projecten[0];
+  const laatsteItem = project.items[project.items.length - 1];
+
+  if (!laatsteItem) return;
+
+  if (!Array.isArray(laatsteItem.extraInfo)) laatsteItem.extraInfo = [];
+  laatsteItem.extraInfo.push({
+    id: maakId(),
+    tekst,
+    bron: bron || tab.url || "",
+    paginaTitel: tab.title || "",
+    datum: new Date().toISOString()
+  });
+
+  await chrome.storage.local.set({
+    projecten: state.projecten,
+    actiefProjectId: project.id,
+    items: []
+  });
+
+  chrome.action.setBadgeText({ text: String(project.items.filter((item) => !item.verborgen).length) });
+  chrome.action.setBadgeBackgroundColor({ color: "#2e7d32" });
+}
+
 function maakId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -141,6 +180,86 @@ function maakBasisItem(tab, extra) {
     verwerkt: false,
     screenshot: extra.screenshot || ""
   };
+}
+
+async function bepaalPaginaBron(tab) {
+  if (!tab.url || !tab.url.includes("facebook.com")) return tab.url || "";
+
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: vindFacebookPermalink
+    });
+    return result?.result || tab.url;
+  } catch (err) {
+    console.warn("Facebook-permalink kon niet bepaald worden", err);
+    return tab.url;
+  }
+}
+
+// Facebook toont in de tijdlijn zelden de echte post-URL in de adresbalk: de
+// permalink zit verstopt achter de "tijd geleden"-link (bv. "4u") bovenaan de post.
+// Deze functie zoekt die link op binnen de post die de gebruiker aan het bewerken is.
+function vindFacebookPermalink() {
+  function opschonenUrl(url) {
+    try {
+      const parsed = new URL(url);
+      if (/permalink\.php|story\.php/i.test(parsed.pathname)) {
+        const behoud = new URLSearchParams();
+        ["story_fbid", "id", "v"].forEach((sleutel) => {
+          if (parsed.searchParams.has(sleutel)) behoud.set(sleutel, parsed.searchParams.get(sleutel));
+        });
+        parsed.search = behoud.toString() ? `?${behoud.toString()}` : "";
+      } else {
+        parsed.search = "";
+      }
+      parsed.hash = "";
+      return parsed.toString();
+    } catch {
+      return url;
+    }
+  }
+
+  function zoekPermalinkIn(container) {
+    if (!container) return "";
+    const permalinkPatroon = /\/(posts|videos|photo(\.php)?|reel|permalink\.php|story\.php|watch)(\/|\?)|story_fbid=|pfbid/i;
+    const kandidaten = Array.from(container.querySelectorAll("a[href]"))
+      .map((a) => a.href)
+      .filter((href) => permalinkPatroon.test(href));
+
+    if (kandidaten.length === 0) return "";
+
+    const zonderCommentId = kandidaten.filter((href) => !href.includes("comment_id"));
+    const lijst = zonderCommentId.length ? zonderCommentId : kandidaten;
+    const beste = lijst.find((href) => /pfbid|\/posts\//i.test(href)) || lijst[0];
+
+    return opschonenUrl(beste);
+  }
+
+  const dialoogArtikel = document.querySelector('[role="dialog"] [role="article"]');
+  if (dialoogArtikel) {
+    const link = zoekPermalinkIn(dialoogArtikel);
+    if (link) return link;
+  }
+
+  const selectie = window.getSelection();
+  if (selectie && !selectie.isCollapsed && selectie.rangeCount > 0) {
+    let element = selectie.getRangeAt(0).commonAncestorContainer;
+    if (element.nodeType === Node.TEXT_NODE) element = element.parentElement;
+    const artikel = element?.closest?.('[role="article"]');
+    if (artikel) {
+      const link = zoekPermalinkIn(artikel);
+      if (link) return link;
+    }
+  }
+
+  const artikelen = document.querySelectorAll('[role="article"]');
+  if (artikelen.length === 1) {
+    const link = zoekPermalinkIn(artikelen[0]);
+    if (link) return link;
+  }
+
+  return "";
 }
 
 async function haalPaginaMeta(tabId) {
